@@ -1,5 +1,8 @@
 # VÁGÁNYMESTER Mobile
 
+**0.4.0:** 6 ország, 60 pálya, csillagos nehézség és jutalom, szintzárak, országfüggő vonatok és táj, helyi kampánymentés. [Kampányrendszer dokumentáció](CAMPAIGN.md).
+
+
 **0.3.0 frissítés:** világos, eredeti rajzolt casual-játékvilág, új főmenü és HUD, modern vonatok, kényelmes vezérlés. Részletek: [ART_DIRECTION.md](ART_DIRECTION.md).
 
 

@@ -3,6 +3,7 @@ import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
 
 import 'simulation.dart';
+import 'level_catalog.dart';
 
 /// Original, vector-based, colorful casual-game world.
 /// Everything here is decoration or a visual representation of actual
@@ -16,6 +17,7 @@ class PlayfulWorld extends PositionComponent {
   @override
   void render(Canvas canvas) {
     _background(canvas);
+    _countryScenery(canvas);
     _terrain(canvas);
     _details(canvas);
     for (final station in simulation.stations) {
@@ -23,17 +25,35 @@ class PlayfulWorld extends PositionComponent {
     }
     _tracks(canvas);
     _signals(canvas);
+    _atmosphere(canvas);
   }
 
   void _background(Canvas canvas) {
     final sky = Rect.fromLTWH(0, 0, 1400, 650);
+    final colors = switch (simulation.level.country.code) {
+      'at' => const <Color>[
+        Color(0xFF7ACAF2), Color(0xFFC6F4FE),
+        Color(0xFF96D8AB), Color(0xFF67B99B)],
+      'ch' => const <Color>[
+        Color(0xFF7BB8F0), Color(0xFFE6F9FF),
+        Color(0xFFD7E9E9), Color(0xFF81C7AF)],
+      'de' => const <Color>[
+        Color(0xFF84C7F5), Color(0xFFC5E9FD),
+        Color(0xFFB7E19A), Color(0xFF8FC77B)],
+      'it' => const <Color>[
+        Color(0xFF67C9F1), Color(0xFFCCF6FF),
+        Color(0xFF95DEBB), Color(0xFF62C79C)],
+      'jp' => const <Color>[
+        Color(0xFF79BDF3), Color(0xFFFFE9F7),
+        Color(0xFFD6DAB7), Color(0xFF87C69C)],
+      _ => const <Color>[
+        Color(0xFF70CDF9), Color(0xFFC7F2FF),
+        Color(0xFF91D77B), Color(0xFF70C96E)],
+    };
     canvas.drawRect(sky, Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [Color(0xFF70CDF9), Color(0xFFC7F2FF),
-          Color(0xFF91D77B), Color(0xFF70C96E)],
-        stops: [0, 0.31, 0.34, 1],
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter, end: Alignment.bottomCenter,
+        colors: colors, stops: const [0, .31, .34, 1],
       ).createShader(sky));
 
     for (final data in <(double, double, double)>[
@@ -60,6 +80,105 @@ class PlayfulWorld extends PositionComponent {
       ..quadraticBezierTo(1117, 144, 1400, 190)
       ..lineTo(1400, 239)..close();
     canvas.drawPath(hills, Paint()..color = const Color(0xFF75B875));
+  }
+
+  void _countryScenery(Canvas c) {
+    final code = simulation.level.country.code;
+    final mountains = code == 'at' || code == 'ch' || code == 'jp';
+    if (mountains) {
+      final paint = Paint()..color = code == 'ch'
+          ? const Color(0xFF8EA7BD)
+          : const Color(0xFF7E9FA8);
+      for (final x in <double>[90, 420, 870, 1190]) {
+        final peak = Path()
+          ..moveTo(x - 150, 217)
+          ..lineTo(x + 12, 96)
+          ..lineTo(x + 160, 217)..close();
+        c.drawPath(peak, paint);
+        final snow = Path()
+          ..moveTo(x - 24, 133)..lineTo(x + 12, 96)
+          ..lineTo(x + 56, 136)
+          ..lineTo(x + 23, 128)
+          ..lineTo(x + 9, 143)
+          ..lineTo(x - 2, 129)..close();
+        c.drawPath(snow, Paint()
+          ..color = const Color(0xFFF7FEFF));
+      }
+    }
+    if (code == 'jp') {
+      final fuji = Path()
+        ..moveTo(920, 215)
+        ..lineTo(1082, 76)
+        ..lineTo(1250, 215)..close();
+      c.drawPath(fuji, Paint()..color = const Color(0xFF8E9EBC));
+      final snow = Path()
+        ..moveTo(1031, 124)..lineTo(1082, 76)
+        ..lineTo(1135, 124)
+        ..lineTo(1115, 117)
+        ..lineTo(1094, 139)
+        ..lineTo(1077, 121)
+        ..lineTo(1060, 139)..close();
+      c.drawPath(snow, Paint()..color = const Color(0xFFF9FFFF));
+    }
+    if (code == 'it') {
+      final shore = Path()
+        ..moveTo(0, 242)
+        ..cubicTo(380, 184, 650, 252, 1400, 204)
+        ..lineTo(1400, 283)
+        ..cubicTo(730, 284, 400, 237, 0, 296)..close();
+      c.drawPath(shore, Paint()..color = const Color(0xFF57D7D5));
+      for (final x in <double>[64, 445, 1095, 1260]) {
+        final palm = Paint()..color = const Color(0xFF8F6740)
+          ..strokeWidth = 7;
+        c.drawLine(Offset(x, 260), Offset(x + 9, 195), palm);
+        for (var d = -2; d <= 2; d++) {
+          c.drawLine(Offset(x + 9, 195),
+              Offset(x + 9 + 26 * d, 185 + 8 * d.abs()),
+              Paint()..color = const Color(0xFF32835C)..strokeWidth = 6);
+        }
+      }
+    }
+    if (code == 'de') {
+      for (final (x, height) in <(double, double)>[
+        (90, 61), (135, 105), (208, 82), (1160, 97), (1220, 72),
+      ]) {
+        c.drawRRect(RRect.fromRectAndRadius(
+          Rect.fromLTWH(x, 216 - height, 39, height),
+          const Radius.circular(5)),
+          Paint()..color = const Color(0xFF709CB8));
+        for (var i = 0; i < 3; i++) {
+          for (var j = 0; j < 2; j++) {
+            c.drawRect(Rect.fromLTWH(x + 8 + j * 15,
+              224 - height + i * 18, 8, 9),
+              Paint()..color = const Color(0xFFE5F5FF));
+          }
+        }
+      }
+    }
+  }
+
+  void _atmosphere(Canvas c) {
+    final feature = simulation.level.feature;
+    if (feature == LevelFeature.night) {
+      c.drawRect(Rect.fromLTWH(0, 0, 1400, 650),
+          Paint()..color = const Color(0x77324574));
+      c.drawCircle(const Offset(1280, 92), 25,
+        Paint()..color = const Color(0xFFF9F8DB));
+    } else if (feature == LevelFeature.fog) {
+      c.drawRect(Rect.fromLTWH(0, 70, 1400, 280),
+        Paint()..shader = const LinearGradient(
+          begin: Alignment.topCenter, end: Alignment.bottomCenter,
+          colors: [Color(0x22E7FBFF), Color(0xB4F1FBFF)],
+        ).createShader(const Rect.fromLTWH(0, 70, 1400, 280)));
+    }
+    if (simulation.level.country.code == 'jp') {
+      for (var i = 0; i < 44; i++) {
+        final x = ((i * 137 + 57) % 1400).toDouble();
+        final y = (200 + i * 71 % 440).toDouble();
+        c.drawCircle(Offset(x, y), 3,
+          Paint()..color = const Color(0xFFFF9DD3));
+      }
+    }
   }
 
   void _cloud(Canvas c, double x, double y, double scale) {

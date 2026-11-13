@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
+import 'level_catalog.dart';
 
 enum TrainKind { regional, intercity, freight }
 
@@ -117,47 +118,86 @@ class SimTrain {
 /// Egy szakaszon egyszerre csak egy vonat közlekedhet.
 /// Az érkezési állomáson már induláskor lefoglalunk egy szabad peronhelyet.
 class RailwaySimulation extends ChangeNotifier {
-  final List<RailwayStation> stations = const [
-    RailwayStation('fenyvesliget', 'Fenyvesliget', 170),
-    RailwayStation('korospatak', 'Kőröspatak', 700, platforms: 4),
-    RailwayStation('tiszavaros', 'Tiszaváros', 1230),
-  ];
+  RailwaySimulation({GameLevel? level}) : level = level ?? LevelCatalog.initial {
+    final selected = this.level;
+    final names = selected.country.stationNames;
+    final edgeTracks = selected.platformCount > 3
+        ? selected.platformCount - 1 : selected.platformCount;
+    stations = [
+      RailwayStation('fenyvesliget', names[0], 170, platforms: edgeTracks),
+      RailwayStation('korospatak', names[1], 700,
+          platforms: selected.id == 'hu-1' ? 4 : selected.platformCount),
+      RailwayStation('tiszavaros', names[2], 1230, platforms: edgeTracks),
+    ];
+    sections = [
+      TrackSection('FV-KP', 'fenyvesliget', 'korospatak',
+          selected.sectionKm),
+      TrackSection('KP-TV', 'korospatak', 'tiszavaros',
+          selected.sectionKm * (1 + selected.number % 3 * .09)),
+    ];
+    trains.addAll(_makeTrains());
+    if (selected.feature == LevelFeature.maintenance) {
+      // A lezárt legkülső vágány egyetlen induló vonatot sem tartalmaz.
+      stationControls['korospatak']!.closedTracks.add(
+          selected.platformCount - 1);
+    }
+  }
 
-  final List<TrackSection> sections = [
-    TrackSection('FV-KP', 'fenyvesliget', 'korospatak', 6),
-    TrackSection('KP-TV', 'korospatak', 'tiszavaros', 6),
-  ];
-
+  final GameLevel level;
+  late final List<RailwayStation> stations;
+  late final List<TrackSection> sections;
   late final Map<String, StationControls> stationControls = {
-    for (final s in stations) s.id: StationControls(s),
+    for (final station in stations) station.id: StationControls(station),
   };
+  final List<SimTrain> trains = [];
 
-  final List<SimTrain> trains = [
-    SimTrain(
-      number: 'S 2412',
-      kind: TrainKind.regional,
-      driver: 'Kovács András',
-      route: ['fenyvesliget', 'korospatak', 'tiszavaros'],
-      speedKmH: 88,
-      readyAt: 10,
-    ),
-    SimTrain(
-      number: 'IC 502',
-      kind: TrainKind.intercity,
-      driver: 'Szabó Anna',
-      route: ['tiszavaros', 'korospatak', 'fenyvesliget'],
-      speedKmH: 120,
-      readyAt: 30,
-    ),
-    SimTrain(
-      number: 'G 921',
-      kind: TrainKind.freight,
-      driver: 'Nagy Péter',
-      route: ['korospatak', 'tiszavaros'],
-      speedKmH: 65,
-      readyAt: 70,
-    ),
-  ];
+  List<SimTrain> _makeTrains() {
+    if (level.id == 'hu-1') {
+      return [
+        SimTrain(number: 'S 2412', kind: TrainKind.regional,
+          driver: 'Kovács András',
+          route: ['fenyvesliget','korospatak','tiszavaros'],
+          speedKmH: 88, readyAt: 10),
+        SimTrain(number: 'IC 502', kind: TrainKind.intercity,
+          driver: 'Szabó Anna',
+          route: ['tiszavaros','korospatak','fenyvesliget'],
+          speedKmH: 120, readyAt: 30),
+        SimTrain(number: 'G 921', kind: TrainKind.freight,
+          driver: 'Nagy Péter',
+          route: ['korospatak','tiszavaros'],
+          speedKmH: 65, readyAt: 70),
+      ];
+    }
+    final models = <SimTrain>[];
+    final occupancy = <String, int>{};
+    for (var i = 0; i < level.trainCount; i++) {
+      final kind = level.feature == LevelFeature.freight
+          ? TrainKind.freight
+          : level.feature == LevelFeature.express
+              ? (i.isEven ? TrainKind.intercity : TrainKind.regional)
+              : TrainKind.values[(i + level.number) % 3];
+      final route = switch (i % 3) {
+        0 => <String>['fenyvesliget','korospatak','tiszavaros'],
+        1 => <String>['tiszavaros','korospatak','fenyvesliget'],
+        _ => <String>['korospatak','tiszavaros'],
+      };
+      final source = route.first;
+      final trackIndex = occupancy[source] ?? 0;
+      occupancy[source] = trackIndex + 1;
+      final train = SimTrain(
+        number: level.country.prefix + ' ' +
+            (level.number * 100 + i + 1).toString(),
+        kind: kind,
+        driver: 'Forgalmi szolgálat ' + (i + 1).toString(),
+        route: route,
+        speedKmH: kind == TrainKind.intercity ? 130 :
+            kind == TrainKind.freight ? 70 : 94,
+        readyAt: 6 + i * level.departureInterval,
+      )..platformTrack = trackIndex;
+      models.add(train);
+    }
+    return models;
+  }
 
   double elapsedSeconds = 0;
   int timeMultiplier = 30;
@@ -170,6 +210,8 @@ class RailwaySimulation extends ChangeNotifier {
   int combo = 0;
   int collisionCount = 0;
   bool gameOver = false;
+  bool levelComplete = false;
+  int earnedStars = 0;
   bool riskMode = false;
   String message = 'Állíts váltót és jelzőt, majd engedélyezd az indulást!';
 
@@ -314,8 +356,7 @@ class RailwaySimulation extends ChangeNotifier {
   }
 
   void newShift() {
-    final fresh = RailwaySimulation();
-    trains..clear()..addAll(fresh.trains);
+    trains..clear()..addAll(_makeTrains());
     elapsedSeconds = 0;
     score = 0;
     lives = 3;
@@ -323,6 +364,8 @@ class RailwaySimulation extends ChangeNotifier {
     collisionCount = 0;
     completedLegs = 0;
     gameOver = false;
+    levelComplete = false;
+    earnedStars = 0;
     emergency = false;
     running = true;
     message = 'Új szolgálat indult. Balesetmentes közlekedést!';
@@ -335,7 +378,10 @@ class RailwaySimulation extends ChangeNotifier {
     for (final s in sections) {
       s.closed = false;
     }
-    fresh.dispose();
+    if (level.feature == LevelFeature.maintenance) {
+      stationControls['korospatak']!.closedTracks.add(
+          level.platformCount - 1);
+    }
     notifyListeners();
   }
 
@@ -351,9 +397,7 @@ class RailwaySimulation extends ChangeNotifier {
     score = math.max(0, score - 250);
     combo = 0;
     message = 'ÜTKÖZÉS! -1 élet, -250 pont. A forgalom visszaállt.';
-    final fresh = RailwaySimulation();
-    trains..clear()..addAll(fresh.trains);
-    fresh.dispose();
+    trains..clear()..addAll(_makeTrains());
     for (final c in stationControls.values) {
       c.allRed();
     }
@@ -402,7 +446,7 @@ class RailwaySimulation extends ChangeNotifier {
   /// Külső képkockaidő. A belső logika legfeljebb fél szimulációs
   /// másodperces lépésekben halad, így nem ugrik át foglaltsági eseményeket.
   void tick(double realSeconds) {
-    if (!running || emergency || gameOver) return;
+    if (!running || emergency || gameOver || levelComplete) return;
     var remaining = realSeconds.clamp(0.0, 0.2).toDouble() * timeMultiplier;
     while (remaining > 0) {
       final step = math.min(0.5, remaining);
@@ -419,7 +463,8 @@ class RailwaySimulation extends ChangeNotifier {
     for (final train in trains.where((t) => t.moving)) {
       final section = sectionBetween(
         train.currentStationId, train.nextStationId);
-      train.progress += dt * train.speedKmH / (3600 * section.lengthKm);
+      train.progress += dt * train.speedKmH * level.speedFactor /
+          (3600 * section.lengthKm);
       if (train.progress >= 1) {
         train.leg++;
         train.platformTrack = train.arrivalTrack;
@@ -433,13 +478,25 @@ class RailwaySimulation extends ChangeNotifier {
             (train.kind == TrainKind.intercity ? 50 : 0);
         score += reward;
         message = train.number + ' megérkezett. +' + reward.toString() + ' pont';
-        train.readyAt = elapsedSeconds + 35;
+        train.readyAt = elapsedSeconds + level.turnaroundSeconds;
         // Végállomás: tényleges megállás után indulhat vissza.
         if (train.leg == train.route.length - 1) {
           train.route = train.route.reversed.toList();
           train.leg = 0;
         }
       }
+    }
+
+    if (!levelComplete && completedLegs >= level.requiredArrivals) {
+      levelComplete = true;
+      running = false;
+      earnedStars = lives == 3 && collisionCount == 0 &&
+              elapsedSeconds <= level.targetSeconds ? 3
+          : lives >= 2 && elapsedSeconds <= level.targetSeconds * 1.65
+              ? 2 : 1;
+      message = 'PÁLYA TELJESÍTVE! ' +
+          earnedStars.toString() + ' csillag, ' + score.toString() + ' pont.';
+      return;
     }
 
     // Állomási foglaltság és InterCity-elsőbbség: minden indulás egyenként

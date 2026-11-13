@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../game/railway_game.dart';
 import '../game/simulation.dart';
+import '../game/level_catalog.dart';
 import '../data/session_store.dart';
 import 'main_menu.dart';
 import 'station_controls_panel.dart';
@@ -16,9 +17,13 @@ class DispatchScreen extends StatefulWidget {
     super.key,
     required this.store,
     required this.onExit,
+    required this.onNext,
+    required this.level,
   });
   final SessionStore store;
   final VoidCallback onExit;
+  final ValueChanged<GameLevel> onNext;
+  final GameLevel level;
 
   @override
   State<DispatchScreen> createState() => _DispatchScreenState();
@@ -34,7 +39,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
   @override
   void initState() {
     super.initState();
-    simulation = RailwaySimulation()
+    simulation = RailwaySimulation(level: widget.level)
       ..setAutomatic(widget.store.autoDispatch)
       ..setRiskMode(widget.store.riskMode)
       ..setMultiplier(widget.store.speed);
@@ -54,12 +59,78 @@ class _DispatchScreenState extends State<DispatchScreen> {
   }
 
   void _checkGameOver() {
-    if (!simulation.gameOver || _scoreRecorded) return;
+    if (_scoreRecorded) return;
+    if (simulation.levelComplete) {
+      _scoreRecorded = true;
+      widget.store.finishLevel(
+        widget.level, simulation.earnedStars, simulation.score,
+      ).then((_) {
+        if (!mounted) return;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showLevelComplete();
+        });
+      });
+      return;
+    }
+    if (!simulation.gameOver) return;
     _scoreRecorded = true;
     widget.store.recordScore(simulation.score);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _showGameOver();
     });
+  }
+
+  Future<void> _showLevelComplete() async {
+    final stars = simulation.earnedStars;
+    final next = LevelCatalog.next(widget.level);
+    final unlocked = next != null && widget.store.campaign.isUnlocked(next);
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFFF2FBFF),
+        title: Text(widget.level.country.flag + '  PÁLYA TELJESÍTVE!',
+          style: const TextStyle(color: Color(0xFF174A70),
+              fontWeight: FontWeight.w900)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(List.filled(stars, '⭐').join() +
+                List.filled(3 - stars, '☆').join(),
+              style: const TextStyle(fontSize: 39)),
+            const SizedBox(height: 9),
+            Text(widget.level.title,
+              style: const TextStyle(color: Color(0xFF174A70),
+                  fontSize: 18, fontWeight: FontWeight.w800)),
+            Text(simulation.score.toString() + ' pont • ' +
+                  simulation.completedLegs.toString() + ' sikeres menet',
+              style: const TextStyle(color: Color(0xFF416D84))),
+            const SizedBox(height: 7),
+            Text(unlocked ? 'Új pálya feloldva!' : 'A kampány végére értél!',
+              style: const TextStyle(color: Color(0xFF2A8E62),
+                  fontWeight: FontWeight.w800)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              widget.onExit();
+            },
+            child: const Text('PÁLYAVÁLASZTÓ'),
+          ),
+          if (unlocked)
+            FilledButton.icon(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                widget.onNext(next!);
+              },
+              icon: const Icon(Icons.skip_next_rounded),
+              label: const Text('KÖVETKEZŐ PÁLYA'),
+            ),
+        ],
+      ),
+    );
   }
 
   Future<void> _showGameOver() async {
@@ -321,24 +392,32 @@ class _DispatchScreenState extends State<DispatchScreen> {
   }
 
   Widget _levelCard() {
-    final level = 1 + simulation.score ~/ 1000;
-    final progress = (simulation.score % 1000) / 1000;
+    final stage = widget.level;
+    final progress = (simulation.completedLegs / stage.requiredArrivals)
+        .clamp(0.0, 1.0);
     return _playfulCard(
       child: SizedBox(
-        width: 124,
+        width: 132,
         child: Column(mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('⭐ ' + level.toString() + '. SZINT',
+            Text(stage.country.flag + ' ' + stage.number.toString() +
+                '/10 PÁLYA',
                 style: const TextStyle(color: Color(0xFF184E78),
                     fontWeight: FontWeight.w900, fontSize: 11)),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             ClipRRect(borderRadius: BorderRadius.circular(10),
               child: LinearProgressIndicator(
                 value: progress, minHeight: 7,
                 backgroundColor: const Color(0xFFB2DCE8),
-                valueColor: const AlwaysStoppedAnimation(Color(0xFF39DFA8)),
+                valueColor: const AlwaysStoppedAnimation(
+                    Color(0xFF39DFA8)),
               )),
+            const SizedBox(height: 2),
+            Text(simulation.completedLegs.toString() + '/' +
+                stage.requiredArrivals.toString() + ' menet',
+                style: const TextStyle(color: Color(0xFF406A88),
+                    fontSize: 9, fontWeight: FontWeight.w700)),
           ],
         ),
       ),
@@ -364,9 +443,11 @@ class _DispatchScreenState extends State<DispatchScreen> {
                     fontSize: 12, fontWeight: FontWeight.w900)),
             ]),
             const Divider(height: 10),
-            _missionRow('Járatok', simulation.completedLegs, 5,
+            _missionRow('Sikeres menetek', simulation.completedLegs,
+                widget.level.requiredArrivals,
                 const Color(0xFF31CC83)),
-            _missionRow('Szerezz pontot', simulation.score, 1500,
+            _missionRow('Gyűjts pontokat', simulation.score,
+                widget.level.requiredArrivals * 120,
                 const Color(0xFFFFB93B)),
             if (!compact)
               _missionRow('Balesetmentes', 3 - simulation.collisionCount, 3,
@@ -606,6 +687,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
   }
 
   void _dispatchSelected() {
+    if (simulation.levelComplete || simulation.gameOver) return;
     if (simulation.emergency) {
       _warn('Vészleállítás aktív. Előbb oldd fel!');
       return;

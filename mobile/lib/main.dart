@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'data/session_store.dart';
+import 'game/level_catalog.dart';
 import 'ui/dispatch_screen.dart';
+import 'ui/campaign_screen.dart';
 import 'ui/main_menu.dart';
 
 Future<void> main() async {
@@ -49,6 +51,8 @@ class _HomeGateState extends State<HomeGate> {
   final SessionStore store = SessionStore();
   bool loaded = false;
   bool playing = false;
+  bool selecting = false;
+  GameLevel? currentLevel;
 
   @override
   void initState() {
@@ -74,15 +78,42 @@ class _HomeGateState extends State<HomeGate> {
     }
     return AnimatedBuilder(
       animation: store,
-      builder: (context, _) => playing
-          ? DispatchScreen(
-              store: store,
-              onExit: () => setState(() => playing = false),
-            )
-          : MainMenu(
-              store: store,
-              onStart: () => setState(() => playing = true),
-            ),
+      builder: (context, _) {
+        if (playing && currentLevel != null) {
+          return DispatchScreen(
+            key: ValueKey(currentLevel!.id),
+            level: currentLevel!,
+            store: store,
+            onExit: () => setState(() {
+              playing = false;
+              selecting = true;
+            }),
+            onNext: (level) => setState(() {
+              currentLevel = level;
+              playing = true;
+              selecting = false;
+            }),
+          );
+        }
+        if (selecting) {
+          return CampaignScreen(
+            store: store,
+            onBack: () => setState(() => selecting = false),
+            onPlay: (level) {
+              if (!store.campaign.isUnlocked(level)) return;
+              setState(() {
+                currentLevel = level;
+                playing = true;
+                selecting = false;
+              });
+            },
+          );
+        }
+        return MainMenu(
+          store: store,
+          onStart: () => setState(() => selecting = true),
+        );
+      },
     );
   }
 }
