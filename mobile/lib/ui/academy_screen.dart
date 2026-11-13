@@ -206,7 +206,7 @@ class _AcademyScreenState extends State<AcademyScreen> {
                 ),
             ]),
           ]),
-        )),
+        ),
       ])),
     );
   }

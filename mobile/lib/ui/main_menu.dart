@@ -10,6 +10,7 @@ class MainMenu extends StatefulWidget {
     required this.onTutorial});
   final SessionStore store;
   final VoidCallback onStart;
+  final VoidCallback onTutorial;
   @override
   State<MainMenu> createState() => _MainMenuState();
 }
@@ -137,6 +138,14 @@ class _MainMenuState extends State<MainMenu> {
                           _secondaryButton(GameL10n.tr('BEÁLLÍTÁSOK'),
                               Icons.settings_rounded,
                               () => showSettings(context, widget.store)),
+                          const SizedBox(height: 7),
+                          _secondaryButton(
+                            switch (widget.store.language) {
+                              'en' => 'TRAINING ACADEMY',
+                              'de' => 'TRAININGSAKADEMIE',
+                              _ => 'OKTATÓ AKADÉMIA',
+                            },
+                            Icons.school_rounded, widget.onTutorial),
                           TextButton(
                             onPressed: widget.store.signOut,
                             child: Text(GameL10n.tr('Vendégváltás'),

@@ -183,7 +183,7 @@ class _HelpCenterSheetState extends State<HelpCenterSheet> {
               style: const TextStyle(color: Color(0xFF396A86),
                 fontSize: 12, fontWeight: FontWeight.w800)),
           ]),
-        )),
+        ),
         FilledButton.icon(
           onPressed: progress.points >= cost && widget.store.helpInventory.chests < 999
             ? () async {

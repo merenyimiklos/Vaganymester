@@ -473,7 +473,7 @@ class _AcademyLessonScreenState extends State<AcademyLessonScreen> {
                       style: const TextStyle(color: Color(0xFF688B9E),
                         fontSize: 11)),
                   ]),
-                )),
+                ),
               ]),
             ),
           ),
@@ -543,7 +543,6 @@ class _AcademyLessonScreenState extends State<AcademyLessonScreen> {
                           fontWeight: FontWeight.w900)),
                     ]),
                   ))),
-              ),
           ])),
         ]);
       })),

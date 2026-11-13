@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../game/level_catalog.dart';
 import '../game/campaign_progress.dart';
 import '../game/help_inventory.dart';
+import '../game/academy_progress.dart';
 import '../l10n/game_l10n.dart';
 
 class ScoreEntry {
@@ -31,6 +32,11 @@ class SessionStore extends ChangeNotifier {
   bool riskMode = false;
   bool showHints = true;
   int speed = 30;
+  bool musicEnabled = true;
+  bool trainSoundsEnabled = true;
+  bool hapticsEnabled = true;
+  double masterVolume = .55;
+  AcademyProgress academy = AcademyProgress();
   String language = 'hu';
   Set<String> introducedLevels = {};
   List<ScoreEntry> leaderboard = [];
@@ -39,6 +45,7 @@ class SessionStore extends ChangeNotifier {
 
   String get _campaignKey => 'campaign_progress:' + (playerName ?? 'guest');
   String get _helpKey => 'help_inventory:' + (playerName ?? 'guest');
+  String get _academyKey => 'academy_progress:' + (playerName ?? 'guest');
 
   Future<void> load() async {
     playerName = await _prefs.getString('profile_name');
@@ -46,6 +53,11 @@ class SessionStore extends ChangeNotifier {
     riskMode = await _prefs.getBool('setting_risk') ?? false;
     showHints = await _prefs.getBool('setting_hints') ?? true;
     speed = await _prefs.getInt('setting_speed') ?? 30;
+    musicEnabled = await _prefs.getBool('setting_music') ?? true;
+    trainSoundsEnabled = await _prefs.getBool('setting_train_sounds') ?? true;
+    hapticsEnabled = await _prefs.getBool('setting_haptics') ?? true;
+    masterVolume = ((await _prefs.getDouble('setting_volume')) ?? .55)
+        .clamp(0, 1).toDouble();
     final savedLanguage = await _prefs.getString('setting_language');
     language = GameL10n.supported.contains(savedLanguage)
         ? savedLanguage! : 'hu';
@@ -54,6 +66,7 @@ class SessionStore extends ChangeNotifier {
         'introduced_levels:' + (playerName ?? 'guest')) ?? []).toSet();
     await _loadCampaign();
     await _loadHelps();
+    await _loadAcademy();
     final entries = await _prefs.getStringList('scores') ?? [];
     leaderboard = [];
     for (final raw in entries) {
@@ -101,6 +114,63 @@ class SessionStore extends ChangeNotifier {
     }
   }
 
+  Future<void> _loadAcademy() async {
+    academy = AcademyProgress();
+    final raw = await _prefs.getString(_academyKey);
+    if (raw == null) return;
+    try {
+      academy = AcademyProgress.fromJson(
+        jsonDecode(raw) as Map<String, dynamic>,
+      );
+    } on FormatException {
+      academy = AcademyProgress();
+    } on TypeError {
+      academy = AcademyProgress();
+    }
+  }
+  Future<void> _saveAcademy() async {
+    await _prefs.setString(_academyKey, jsonEncode(academy.toJson()));
+    notifyListeners();
+  }
+  Future<int> completeAcademyLesson(int index) async {
+    final gained = academy.complete(index);
+    if (gained > 0) await _saveAcademy();
+    return gained;
+  }
+  Future<void> skipAcademy() async {
+    academy.skip();
+    await _saveAcademy();
+  }
+  /// Tutorial points are earned in-game only, not purchased.
+  Future<bool> buyChestWithPoints() async {
+    if (helpInventory.chests >= 999 ||
+        !academy.spend(AcademyProgress.chestPrice)) return false;
+    helpInventory.chests++;
+    await _prefs.setString(_academyKey, jsonEncode(academy.toJson()));
+    await _saveHelps();
+    return true;
+  }
+  Future<void> setMusic(bool enabled) async {
+    musicEnabled = enabled;
+    notifyListeners();
+    await _prefs.setBool('setting_music', enabled);
+  }
+  Future<void> setTrainSounds(bool enabled) async {
+    trainSoundsEnabled = enabled;
+    notifyListeners();
+    await _prefs.setBool('setting_train_sounds', enabled);
+  }
+  Future<void> setHaptics(bool enabled) async {
+    hapticsEnabled = enabled;
+    notifyListeners();
+    await _prefs.setBool('setting_haptics', enabled);
+  }
+  Future<void> setVolume(double volume) async {
+    masterVolume = volume.clamp(0, 1).toDouble();
+    notifyListeners();
+    await _prefs.setDouble('setting_volume', masterVolume);
+  }
+
   /// Grant one one-time demo chest for the hands-on help lesson.
   Future<bool> grantAcademyDemoChest() async {
     final added = helpInventory.earnChest('academy-help-demo');
@@ -134,6 +204,7 @@ class SessionStore extends ChangeNotifier {
     await _prefs.setString('profile_name', playerName!);
     await _loadCampaign();
     await _loadHelps();
+    await _loadAcademy();
     introducedLevels = (await _prefs.getStringList(
         'introduced_levels:' + (playerName ?? 'guest')) ?? []).toSet();
     notifyListeners();
@@ -144,6 +215,7 @@ class SessionStore extends ChangeNotifier {
     await _prefs.remove('profile_name');
     campaign = CampaignProgress();
     helpInventory = HelpInventory();
+    academy = AcademyProgress();
     introducedLevels = {};
     notifyListeners();
   }
