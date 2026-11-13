@@ -1,5 +1,20 @@
 # VÁGÁNYMESTER — WPF forgalmi szolgálattevő szimulátor
 
+## 🖥️ Windows telepítő – letöltés
+
+**A Windows WPF-szimulátor teljes telepítője** egyetlen .exe fájl,
+nincs szükség Visual Studióra vagy külön .NET-re.
+
+[**VÁGÁNYMESTER Windows telepítő letöltése**](https://github.com/merenyimiklos/Vaganymester/releases/download/wpf-preview/Vaganymester-Windows-Setup.exe)
+
+A telepítő Windows 10/11 x64 rendszerre készült, egyedi
+ikont és sötét telepítőgrafikát tartalmaz. A program még
+tesztverzió, digitális aláírás hiányában a Windows
+SmartScreen figyelmeztetést jeleníthet meg.
+
+---
+
+
 Saját, tanulásra és játékra készült, egyállomásos **C# / WPF** szimulátor.
 
 ## Megnyitás Windows alatt

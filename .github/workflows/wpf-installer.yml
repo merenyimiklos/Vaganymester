@@ -96,3 +96,25 @@ jobs:
             artifacts/installer/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 90
+
+      - name: Publish public, shareable Windows preview release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = 'wpf-preview'
+          $setup = 'artifacts/installer/Vaganymester-Windows-Setup.exe'
+          $hash = 'artifacts/installer/SHA256SUMS.txt'
+          $notes = 'installer/RELEASE_NOTES.md'
+          gh release view $tag --json tagName 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $setup $hash --clobber
+            if ($LASTEXITCODE -ne 0) { throw 'Release asset upload failed.' }
+            gh release edit $tag --title 'VÁGÁNYMESTER – Windows tesztverzió' --notes-file $notes --prerelease --latest=false
+            if ($LASTEXITCODE -ne 0) { throw 'Release edit failed.' }
+          } else {
+            gh release create $tag $setup $hash --target "$env:GITHUB_SHA" --title "VÁGÁNYMESTER – Windows tesztverzió" --notes-file $notes --prerelease --latest=false
+            if ($LASTEXITCODE -ne 0) { throw 'Release creation failed.' }
+          }
+          Write-Host "Public download: https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/Vaganymester-Windows-Setup.exe"
