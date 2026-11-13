@@ -177,5 +177,8 @@ Nincs indulásra váró vonat.|No train is ready to depart.|Kein Zug ist abfahrb
 A vonat nem indítható.|The train cannot be dispatched.|Der Zug kann nicht abfahren.
 Kézi üzem|Manual mode|Manueller Betrieb
 Kérlek állítsd a váltót!|Please set the switch!|Bitte stelle die Weiche!
+Kövesd a sárgával kiemelt következő lépést!|Follow the next yellow highlighted action!|Folge der nächsten gelb markierten Aktion!
+Ez a vonat nem indítható.|This train cannot depart.|Dieser Zug kann nicht abfahren.
+A vonat nem indítható.|The train cannot depart.|Dieser Zug kann nicht abfahren.
 ''';
 }

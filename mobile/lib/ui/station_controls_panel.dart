@@ -70,7 +70,7 @@ class StationControlsPanel extends StatelessWidget {
           title: Text(GameL10n.tr('Automata irányítás')),
           subtitle: Text(GameL10n.tr('Kézi módban állíts váltókat és jelzőket')),
           value: simulation.automatic,
-          onChanged: onAutomatic,
+          onChanged: tutorial?.active == true ? null : onAutomatic,
         ),
         const Divider(),
         _side(GameL10n.tr('NYUGATI BIZTOSÍTÁS'), RailwaySide.west, c),

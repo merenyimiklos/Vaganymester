@@ -860,6 +860,11 @@ class _DispatchScreenState extends State<DispatchScreen> {
           ? Icons.smart_toy_rounded : Icons.tune_rounded,
         tooltip: GameL10n.tr('Automatikus / kézi forgalom'),
         onTap: () {
+          if (_tutorial?.active == true &&
+              _tutorial?.step != TutorialStep.enableAutomatic) {
+            _warn(GameL10n.tr('Kövesd a sárgával kiemelt következő lépést!'));
+            return;
+          }
           simulation.setAutomatic(!simulation.automatic);
           widget.store.setAuto(simulation.automatic);
           if (simulation.automatic) {
@@ -1139,6 +1144,11 @@ class _DispatchScreenState extends State<DispatchScreen> {
 
   void _dispatchSelected() {
     if (simulation.levelComplete || simulation.gameOver) return;
+    if (_tutorial?.active == true &&
+        _tutorial?.step != TutorialStep.departTrain) {
+      _warn(GameL10n.tr('Kövesd a sárgával kiemelt következő lépést!'));
+      return;
+    }
     if (simulation.emergency) {
       _warn('Vészleállítás aktív. Előbb oldd fel!');
       return;
@@ -1295,8 +1305,13 @@ class _DispatchScreenState extends State<DispatchScreen> {
         if (!simulation.automatic && !train.moving) ...[
           FilledButton.icon(
             onPressed: () {
+              if (_tutorial?.active == true &&
+                  _tutorial?.step != TutorialStep.departTrain) {
+                _warn(GameL10n.tr('Kövesd a sárgával kiemelt következő lépést!'));
+                return;
+              }
               if (!simulation.authorize(train.number)) {
-                _warn('Ez a vonat nem indítható.');
+                _warn(GameL10n.tr('Ez a vonat nem indítható.'));
               }
             },
             icon: const Icon(Icons.check_circle_outline),
