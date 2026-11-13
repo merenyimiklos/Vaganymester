@@ -180,7 +180,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final compact = constraints.maxWidth < 850;
+            final compact = constraints.maxWidth < 1050 || constraints.maxHeight < 540;
             return Stack(
               children: [
                 Positioned.fill(
@@ -423,14 +423,15 @@ class _DispatchScreenState extends State<DispatchScreen> {
           _warn('Szimulációs sebesség: ' + next.toString() + '×');
         }),
       const SizedBox(height: 7),
-      _squareAction(icon: simulation.automatic
-          ? Icons.smart_toy_rounded : Icons.tune_rounded,
-        tooltip: 'Automatikus / Kézi forgalom',
-        onTap: () {
-          simulation.setAutomatic(!simulation.automatic);
-          widget.store.setAuto(simulation.automatic);
-        }),
       if (!compact) ...[
+        _squareAction(icon: simulation.automatic
+            ? Icons.smart_toy_rounded : Icons.tune_rounded,
+          tooltip: 'Automatikus / Kézi forgalom',
+          onTap: () {
+            simulation.setAutomatic(!simulation.automatic);
+            widget.store.setAuto(simulation.automatic);
+          }),
+        const SizedBox(height: 7),
         const SizedBox(height: 7),
         _squareAction(icon: Icons.zoom_in_map_rounded,
             tooltip: 'Nagyítás', onTap: () => game.zoom(1.25)),
