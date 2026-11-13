@@ -7,9 +7,9 @@ import '../data/session_store.dart';
 import 'main_menu.dart';
 import 'station_controls_panel.dart';
 
-const _surface = Color(0xFF142B3B);
-const _muted = Color(0xFFA9C5D2);
-const _accent = Color(0xFF35DDC3);
+const _surface = Color(0xFFF6FCFF);
+const _muted = Color(0xFF49738D);
+const _accent = Color(0xFF167DB0);
 
 class DispatchScreen extends StatefulWidget {
   const DispatchScreen({
@@ -141,7 +141,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
       selectedStationId = id;
       selectedTrainId = null;
     });
-    if (MediaQuery.sizeOf(context).width < 1030) _showInfoSheet();
+    _showInfoSheet();
   }
 
   void _selectTrain(String id) {
@@ -154,13 +154,21 @@ class _DispatchScreenState extends State<DispatchScreen> {
       context: context,
       backgroundColor: _surface,
       isScrollControlled: true,
-      builder: (context) => SafeArea(
+      builder: (context) => Theme(
+        data: ThemeData.light(useMaterial3: true).copyWith(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF1C8FBA),
+            brightness: Brightness.light,
+          ),
+        ),
+        child: SafeArea(
         child: SizedBox(
           height: MediaQuery.sizeOf(context).height * 0.83,
           child: AnimatedBuilder(
             animation: simulation,
             builder: (context, _) => _details(),
           ),
+        ),
         ),
       ),
     );
@@ -172,66 +180,63 @@ class _DispatchScreenState extends State<DispatchScreen> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 1030;
-            return Column(
+            final compact = constraints.maxWidth < 850;
+            return Stack(
               children: [
-                AnimatedBuilder(
-                  animation: simulation,
-                  builder: (context, _) => _toolbar(constraints.maxWidth),
+                Positioned.fill(
+                  child: ClipRect(child: GameWidget(game: game)),
                 ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(18),
-                            child: Stack(
-                              children: [
-                                Positioned.fill(child: GameWidget(game: game)),
-                                Positioned(
-                                  left: 12,
-                                  top: 10,
-                                  child: _mapLabel(),
-                                ),
-                                Positioned(
-                                  right: 10,
-                                  bottom: 12,
-                                  child: _mapControls(),
-                                ),
-                                if (!wide)
-                                  Positioned(
-                                    right: 10,
-                                    top: 10,
-                                    child: FilledButton.tonalIcon(
-                                      onPressed: _showInfoSheet,
-                                      icon: const Icon(Icons.tune, size: 18),
-                                      label: const Text('Irányítópult'),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        if (wide) ...[
-                          const SizedBox(width: 12),
-                          SizedBox(
-                            width: 302,
-                            child: AnimatedBuilder(
-                              animation: simulation,
-                              builder: (context, _) => _details(),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+                Positioned(
+                  left: 8, right: 8, top: 7,
+                  child: AnimatedBuilder(
+                    animation: simulation,
+                    builder: (_, __) => _gameHud(compact),
                   ),
                 ),
-                AnimatedBuilder(
-                  animation: simulation,
-                  builder: (context, _) => _bottomBar(constraints.maxWidth),
+                Positioned(
+                  top: 78, left: 10,
+                  child: AnimatedBuilder(
+                    animation: simulation,
+                    builder: (_, __) => _missions(compact),
+                  ),
                 ),
+                Positioned(
+                  right: 10, top: 78,
+                  child: AnimatedBuilder(
+                    animation: simulation,
+                    builder: (_, __) => _tools(compact),
+                  ),
+                ),
+                Positioned(
+                  bottom: 76, left: 10,
+                  child: AnimatedBuilder(
+                    animation: simulation,
+                    builder: (_, __) => _selectedCard(compact),
+                  ),
+                ),
+                Positioned(
+                  right: 12, bottom: 77,
+                  child: _dispatchButton(compact),
+                ),
+                Positioned(
+                  left: 6, bottom: 9,
+                  child: _squareAction(
+                    icon: Icons.center_focus_strong,
+                    tooltip: 'Térkép középre',
+                    onTap: game.recenter,
+                  ),
+                ),
+                Positioned(
+                  left: compact ? 80 : 125,
+                  right: compact ? 80 : 125,
+                  bottom: 9,
+                  child: _navigation(compact),
+                ),
+                if (widget.store.showHints && !compact)
+                  Positioned(
+                    right: 205, bottom: 92,
+                    child: _softTag('↔  Két ujjal nagyítható és mozgatható'),
+                  ),
               ],
             );
           },
@@ -240,117 +245,419 @@ class _DispatchScreenState extends State<DispatchScreen> {
     );
   }
 
-  Widget _toolbar(double width) {
+  Widget _gameHud(bool compact) {
     return SizedBox(
-      height: 64,
-      child: SingleChildScrollView(
+      height: 59,
+      child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
+        children: [
+          _logo(compact),
+          const SizedBox(width: 7),
+          _statCard(Icons.stars_rounded, 'PONT',
+              simulation.score.toString(), const Color(0xFFFFCB55)),
+          const SizedBox(width: 7),
+          _statCard(Icons.favorite_rounded, 'ÉLET',
+              simulation.lives.toString() + '/3',
+              const Color(0xFFFF677A)),
+          const SizedBox(width: 7),
+          _statCard(Icons.timer_rounded, 'MŰSZAK',
+              simulation.clock, const Color(0xFF53DCD3)),
+          const SizedBox(width: 7),
+          _levelCard(),
+        ],
+      ),
+    );
+  }
+
+  Widget _logo(bool compact) {
+    return _playfulCard(
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        const CircleAvatar(
+          radius: 20,
+          backgroundColor: Color(0xFFFFCF56),
+          child: Icon(Icons.train_rounded, color: Color(0xFF174D77), size: 25),
+        ),
+        const SizedBox(width: 7),
+        Text(compact ? 'VÁGÁNY\nMESTER' : 'VÁGÁNYMESTER',
+          style: const TextStyle(color: Color(0xFF173F65),
+            fontSize: 14, height: 1.05, fontWeight: FontWeight.w900)),
+      ]),
+    );
+  }
+
+  Widget _playfulCard({required Widget child, EdgeInsets? padding,
+      Color color = const Color(0xFFF7FCFF)}) {
+    return Container(
+      padding: padding ?? const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: [
+          color,
+          Color.lerp(color, const Color(0xFF90CAED), .22)!,
+        ], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(color: Colors.white.withAlpha(240), width: 2),
+        boxShadow: const [BoxShadow(
+            color: Color(0x44265370), blurRadius: 8, offset: Offset(0, 3))],
+      ),
+      child: child,
+    );
+  }
+
+  Widget _statCard(IconData icon, String title, String value, Color color) {
+    return _playfulCard(
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, color: color, size: 31),
+        const SizedBox(width: 5),
+        Column(mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.train, color: _accent, size: 25),
-            const SizedBox(width: 6),
-            const Text('VÁGÁNYMESTER',
-              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
-            const SizedBox(width: 12),
-            _statusPill('★ ' + simulation.score.toString() + ' PONT',
-                const Color(0xFFFFCC68)),
-            const SizedBox(width: 8),
-            _statusPill('♥ ' + simulation.lives.toString() + ' ÉLET',
-                const Color(0xFFF16A74)),
-            const SizedBox(width: 10),
-            Text(simulation.clock, style: const TextStyle(
-              fontFeatures: [FontFeature.tabularFigures()],
-              fontWeight: FontWeight.bold, fontSize: 17)),
-            const SizedBox(width: 7),
-            IconButton.filledTonal(
-              tooltip: simulation.running ? 'Szünet' : 'Folytatás',
-              onPressed: () =>
-                  simulation.setRunning(!simulation.running),
-              icon: Icon(simulation.running ? Icons.pause : Icons.play_arrow),
-            ),
-            DropdownButtonHideUnderline(child: DropdownButton<int>(
-              value: simulation.timeMultiplier,
-              dropdownColor: _surface,
-              items: const [1, 10, 30, 60]
-                  .map((s) => DropdownMenuItem(
-                    value: s, child: Text(s.toString() + '×'),
-                  )).toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  simulation.setMultiplier(value);
-                  widget.store.setSpeed(value);
-                }
-              },
-            )),
-            const SizedBox(width: 8),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: simulation.emergency
-                    ? const Color(0xFF9C3F44) : const Color(0xFF623239),
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () => simulation.setEmergency(!simulation.emergency),
-              icon: const Icon(Icons.warning_amber_rounded, size: 17),
-              label: Text(simulation.emergency ? 'FELOLDÁS' : 'VÉSZSTOP'),
-            ),
-            IconButton(
-              tooltip: 'Ranglista',
-              onPressed: () => showLeaderboard(context, widget.store),
-              icon: const Icon(Icons.emoji_events_outlined),
-            ),
-            IconButton(
-              tooltip: 'Beállítások',
-              onPressed: _openSettings,
-              icon: const Icon(Icons.settings_outlined),
-            ),
-            IconButton(
-              tooltip: 'Szolgálat befejezése',
-              onPressed: _finishShift,
-              icon: const Icon(Icons.home_outlined),
-            ),
+            Text(title, style: const TextStyle(color: Color(0xFF4A7194),
+                fontSize: 9, fontWeight: FontWeight.w800)),
+            Text(value, style: const TextStyle(color: Color(0xFF163B5B),
+                fontSize: 16, fontWeight: FontWeight.w900)),
+          ]),
+      ]),
+    );
+  }
+
+  Widget _levelCard() {
+    final level = 1 + simulation.score ~/ 1000;
+    final progress = (simulation.score % 1000) / 1000;
+    return _playfulCard(
+      child: SizedBox(
+        width: 124,
+        child: Column(mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('⭐ ' + level.toString() + '. SZINT',
+                style: const TextStyle(color: Color(0xFF184E78),
+                    fontWeight: FontWeight.w900, fontSize: 11)),
+            const SizedBox(height: 4),
+            ClipRRect(borderRadius: BorderRadius.circular(10),
+              child: LinearProgressIndicator(
+                value: progress, minHeight: 7,
+                backgroundColor: const Color(0xFFB2DCE8),
+                valueColor: const AlwaysStoppedAnimation(Color(0xFF39DFA8)),
+              )),
           ],
         ),
       ),
     );
   }
 
-  Widget _mapLabel() => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: const Color(0xE60C2838),
-          borderRadius: BorderRadius.circular(9),
-          border: Border.all(color: const Color(0xFF285169)),
+  Widget _missions(bool compact) {
+    final height = compact ? 125.0 : 151.0;
+    return SizedBox(
+      width: compact ? 194 : 238,
+      height: height,
+      child: _playfulCard(
+        padding: const EdgeInsets.fromLTRB(9, 9, 9, 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(children: [
+              Icon(Icons.fact_check_rounded, color: Color(0xFF2788BB),
+                size: 20),
+              SizedBox(width: 6),
+              Text('MAI FELADATOK',
+                style: TextStyle(color: Color(0xFF153E62),
+                    fontSize: 12, fontWeight: FontWeight.w900)),
+            ]),
+            const Divider(height: 10),
+            _missionRow('Járatok', simulation.completedLegs, 5,
+                const Color(0xFF31CC83)),
+            _missionRow('Szerezz pontot', simulation.score, 1500,
+                const Color(0xFFFFB93B)),
+            if (!compact)
+              _missionRow('Balesetmentes', 3 - simulation.collisionCount, 3,
+                  const Color(0xFF459DDF)),
+          ],
         ),
-        child: const Text(
-          'ÉLŐ HÁLÓZAT  •  3 ÁLLOMÁS  •  PINCH TO ZOOM',
-          style: TextStyle(
-            color: _muted,
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1,
+      ),
+    );
+  }
+
+  Widget _missionRow(String name, int current, int target, Color color) {
+    final safe = current.clamp(0, target);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Text(name,
+            style: const TextStyle(color: Color(0xFF1F5278),
+                fontSize: 10, fontWeight: FontWeight.w700))),
+          Text(safe.toString() + '/' + target.toString(),
+            style: const TextStyle(color: Color(0xFF153E62),
+                fontSize: 10, fontWeight: FontWeight.w800)),
+        ]),
+        const SizedBox(height: 2),
+        ClipRRect(borderRadius: BorderRadius.circular(8),
+          child: LinearProgressIndicator(
+            value: safe / target, minHeight: 6,
+            backgroundColor: const Color(0xFFCFDFE9),
+            valueColor: AlwaysStoppedAnimation(color),
           ),
         ),
-      );
+      ]),
+    );
+  }
 
-  Widget _mapControls() => Row(
-        children: [
-          _mapButton(Icons.remove, () => game.zoom(0.82)),
-          const SizedBox(width: 5),
-          _mapButton(Icons.center_focus_strong, game.recenter),
-          const SizedBox(width: 5),
-          _mapButton(Icons.add, () => game.zoom(1.2)),
-        ],
-      );
+  Widget _tools(bool compact) {
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      _squareAction(icon: Icons.settings_rounded,
+          tooltip: 'Beállítások', onTap: _openSettings),
+      const SizedBox(height: 7),
+      _squareAction(icon: simulation.running
+          ? Icons.pause_rounded : Icons.play_arrow_rounded,
+        tooltip: 'Szünet / Indítás',
+        onTap: () => simulation.setRunning(!simulation.running)),
+      const SizedBox(height: 7),
+      _squareAction(icon: Icons.speed_rounded,
+        tooltip: 'Sebesség: ' + simulation.timeMultiplier.toString() + '×',
+        onTap: () {
+          const speeds = [1, 10, 30, 60];
+          final idx = speeds.indexOf(simulation.timeMultiplier);
+          final next = speeds[(idx + 1) % speeds.length];
+          simulation.setMultiplier(next);
+          widget.store.setSpeed(next);
+          _warn('Szimulációs sebesség: ' + next.toString() + '×');
+        }),
+      const SizedBox(height: 7),
+      _squareAction(icon: simulation.automatic
+          ? Icons.smart_toy_rounded : Icons.tune_rounded,
+        tooltip: 'Automatikus / Kézi forgalom',
+        onTap: () {
+          simulation.setAutomatic(!simulation.automatic);
+          widget.store.setAuto(simulation.automatic);
+        }),
+      if (!compact) ...[
+        const SizedBox(height: 7),
+        _squareAction(icon: Icons.zoom_in_map_rounded,
+            tooltip: 'Nagyítás', onTap: () => game.zoom(1.25)),
+        const SizedBox(height: 7),
+        _squareAction(icon: Icons.zoom_out_map_rounded,
+            tooltip: 'Kicsinyítés', onTap: () => game.zoom(.8)),
+      ],
+      const SizedBox(height: 7),
+      _squareAction(icon: Icons.warning_amber_rounded,
+        tooltip: simulation.emergency ? 'Vészleállítás feloldása' :
+            'Vészleállítás',
+        danger: simulation.emergency,
+        onTap: () => simulation.setEmergency(!simulation.emergency)),
+    ]);
+  }
 
-  Widget _mapButton(IconData icon, VoidCallback callback) {
+  Widget _squareAction({required IconData icon, required String tooltip,
+      required VoidCallback onTap, bool danger = false}) {
+    return Tooltip(message: tooltip,
+      child: Material(
+        color: danger ? const Color(0xFFFFDBE0) : const Color(0xFFE6F6FF),
+        borderRadius: BorderRadius.circular(15),
+        elevation: 4,
+        shadowColor: const Color(0x55253B61),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(15), onTap: onTap,
+          child: Container(
+            width: 43, height: 43,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(color: Colors.white, width: 2),
+            ),
+            child: Icon(icon, color: danger
+                ? const Color(0xFFE54B63) : const Color(0xFF155783),
+                size: 25),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _softTag(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xCC153D61),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(label, style: const TextStyle(
+        color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
+    );
+  }
+
+  Widget _selectedCard(bool compact) {
+    final train = selectedTrainId == null
+        ? null : simulation.train(selectedTrainId!);
+    return GestureDetector(
+      onTap: _showInfoSheet,
+      child: SizedBox(
+        width: compact ? 212 : 264,
+        child: _playfulCard(
+          padding: const EdgeInsets.all(11),
+          child: Row(children: [
+            Container(
+              width: 44, height: 49,
+              decoration: BoxDecoration(
+                color: const Color(0xFFCCEAF7),
+                borderRadius: BorderRadius.circular(12)),
+              child: Icon(train == null
+                  ? Icons.holiday_village_rounded
+                  : Icons.train_rounded,
+                color: const Color(0xFF1B75AB), size: 32),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(train?.number ?? simulation.station(selectedStationId).name,
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Color(0xFF153E61),
+                    fontWeight: FontWeight.w900, fontSize: 15)),
+                const SizedBox(height: 3),
+                Text(train == null ? 'Állomásvezérlés megnyitása'
+                    : (train.moving ? 'ÚTON' : 'INDULÁSRA VÁR'),
+                  maxLines: 2, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Color(0xFF336E82),
+                    fontSize: 10, fontWeight: FontWeight.w700)),
+              ],
+            )),
+            const Icon(Icons.chevron_right_rounded,
+                color: Color(0xFF1E6DA2)),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _dispatchButton(bool compact) {
     return Material(
-      color: const Color(0xEE1E4054),
-      borderRadius: BorderRadius.circular(10),
-      child: IconButton(
-        icon: Icon(icon, color: Colors.white, size: 19),
-        onPressed: callback,
-        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+      borderRadius: BorderRadius.circular(23),
+      elevation: 8,
+      shadowColor: const Color(0x88599C20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(23),
+        onTap: _dispatchSelected,
+        child: Container(
+          width: compact ? 139 : 164,
+          height: compact ? 54 : 65,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF9AF85A), Color(0xFF24BE4B)],
+              begin: Alignment.topCenter, end: Alignment.bottomCenter),
+            border: Border.all(color: Colors.white, width: 3),
+            borderRadius: BorderRadius.circular(23)),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.play_arrow_rounded,
+                  color: Color(0xFF135631), size: 32),
+              Text('INDÍTÁS', style: TextStyle(
+                  color: Color(0xFF135631),
+                  fontWeight: FontWeight.w900, fontSize: 17)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _navigation(bool compact) {
+    final items = <(String, IconData, VoidCallback)>[
+      ('Hálózat', Icons.map_rounded, game.recenter),
+      ('Állomás', Icons.holiday_village_rounded, () {
+        setState(() => selectedTrainId = null);
+        _showInfoSheet();
+      }),
+      ('Járatok', Icons.train_rounded, _showTrainList),
+      ('Ranglista', Icons.emoji_events_rounded,
+          () => showLeaderboard(context, widget.store)),
+      ('Menü', Icons.home_rounded, () => _finishShift()),
+    ];
+    return Container(
+      height: compact ? 53 : 62,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF146DAE), Color(0xFF144A88)]),
+        borderRadius: BorderRadius.circular(21),
+        border: Border.all(color: const Color(0xFFF6FFFF), width: 2),
+        boxShadow: const [BoxShadow(
+          color: Color(0x88264B66), blurRadius: 8, offset: Offset(0, 4))],
+      ),
+      child: Row(children: [
+        for (final item in items)
+          Expanded(child: InkWell(
+            onTap: item.$3,
+            borderRadius: BorderRadius.circular(16),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(item.$2, color: Colors.white,
+                    size: compact ? 20 : 24),
+                Text(item.$1,
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: compact ? 9 : 11)),
+              ],
+            ),
+          )),
+      ]),
+    );
+  }
+
+  void _dispatchSelected() {
+    if (simulation.emergency) {
+      _warn('Vészleállítás aktív. Előbb oldd fel!');
+      return;
+    }
+    if (simulation.automatic) {
+      _warn('Automata módban a forgalomirányító kezeli az indulásokat.');
+      return;
+    }
+    final available = simulation.trains.where((t) => !t.moving).toList();
+    if (available.isEmpty) {
+      _warn('Nincs indulásra váró vonat.');
+      return;
+    }
+    final train = selectedTrainId == null
+        ? available.first
+        : simulation.train(selectedTrainId!);
+    if (!simulation.authorize(train.number)) {
+      _warn('A vonat nem indítható.');
+      return;
+    }
+    _warn(train.number + ': indulási engedély rögzítve.');
+  }
+
+  void _showTrainList() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFFE7F8FF),
+      isScrollControlled: true,
+      builder: (sheetContext) => SizedBox(
+        height: MediaQuery.sizeOf(context).height * .83,
+        child: ListView(
+          padding: const EdgeInsets.all(14),
+          children: [
+            const Text('JÁRATOK', style: TextStyle(
+              color: Color(0xFF124469),
+              fontSize: 19, fontWeight: FontWeight.w900)),
+            for (final t in simulation.trains)
+              ListTile(
+                leading: const Icon(Icons.train_rounded,
+                    color: Color(0xFF1A78B4)),
+                title: Text(t.number, style: const TextStyle(
+                  color: Color(0xFF15486B), fontWeight: FontWeight.bold)),
+                subtitle: Text(t.typeLabel,
+                    style: const TextStyle(color: Color(0xFF406C80))),
+                trailing: const Icon(Icons.chevron_right,
+                    color: Color(0xFF15486B)),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  _selectTrain(t.number);
+                },
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -364,7 +671,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
       decoration: BoxDecoration(
         color: _surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF315265)),
+        border: Border.all(color: const Color(0xFF84BEDB), width: 2),
       ),
       padding: const EdgeInsets.all(16),
       child: ListView(
@@ -457,62 +764,4 @@ class _DispatchScreenState extends State<DispatchScreen> {
         ),
       );
 
-  Widget _statusPill(String text, Color color) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: color.withAlpha(22),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withAlpha(90)),
-        ),
-        child: Text(text, style: TextStyle(
-          fontWeight: FontWeight.bold, fontSize: 11, color: color)),
-      );
-
-  Widget _bottomBar(double width) {
-    final compact = width < 1000;
-    return SizedBox(
-      height: 62,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          children: [
-            if (!compact) ...[
-              _statusPill('TELJESÍTETT: ${simulation.completedLegs}', _accent),
-              const SizedBox(width: 12),
-            ],
-            if (widget.store.showHints)
-              SizedBox(
-                width: width < 1000 ? 190 : 280,
-                child: Text(simulation.message,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: _muted, fontSize: 10),
-                ),
-              ),
-            const SizedBox(width: 8),
-            const Text('ÁLLOMÁSOK',
-                style: TextStyle(color: _muted, fontSize: 10,
-                    fontWeight: FontWeight.w700)),
-            const SizedBox(width: 8),
-            Expanded(
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: simulation.stations.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final station = simulation.stations[index];
-                  return ChoiceChip(
-                    selected: selectedTrainId == null &&
-                        selectedStationId == station.id,
-                    label: Text(station.name),
-                    onSelected: (_) => _selectStation(station.id),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

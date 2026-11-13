@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../data/session_store.dart';
+import 'menu_art.dart';
 
 const _panel = Color(0xFF152E41);
-const _mint = Color(0xFF35DDC3);
 
 class MainMenu extends StatefulWidget {
   const MainMenu({super.key, required this.store, required this.onStart});
@@ -25,103 +25,190 @@ class _MainMenuState extends State<MainMenu> {
     final loggedIn = widget.store.playerName != null;
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 900),
-              child: Row(
-                children: [
-                  const Expanded(child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.train_rounded, size: 72, color: _mint),
-                      SizedBox(height: 12),
-                      Text('VÁGÁNYMESTER',
-                        style: TextStyle(fontSize: 30, fontWeight:
-                            FontWeight.w900, letterSpacing: 1.5)),
-                      SizedBox(height: 10),
-                      Text('FORGALOMIRÁNYÍTÓ SZIMULÁTOR',
-                        style: TextStyle(color: _mint,
-                            fontWeight: FontWeight.bold, fontSize: 12)),
-                      SizedBox(height: 16),
-                      Text('Vezesd a vonatokat, állítsd a váltókat, '
-                          'óvd a hálózatot és gyűjts pontokat!',
-                        style: TextStyle(color: Color(0xFFB3CEDB),
-                            height: 1.45)),
-                    ],
-                  )),
-                  const SizedBox(width: 22),
-                  Expanded(child: Card(
-                    color: _panel,
-                    child: Padding(
-                      padding: const EdgeInsets.all(18),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(loggedIn ? 'Üdv, parancsnok!' : 'VENDÉG BELÉPÉS',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w800, fontSize: 18)),
-                          const SizedBox(height: 6),
-                          Text(loggedIn ? widget.store.playerName! :
-                            'Csak egy nevet kérünk. Nincs regisztráció vagy hitelesítés.',
-                            style: const TextStyle(
-                                color: Color(0xFFB3CEDB), fontSize: 12)),
-                          const SizedBox(height: 14),
-                          if (!loggedIn) ...[
-                            TextField(
-                              controller: _name,
-                              maxLength: 20,
-                              textInputAction: TextInputAction.done,
-                              onSubmitted: _login,
-                              decoration: const InputDecoration(
-                                labelText: 'Játékos neve',
-                                border: OutlineInputBorder(),
-                                counterText: '',
-                              ),
-                            ),
-                            FilledButton.icon(
-                              onPressed: () => _login(_name.text),
-                              icon: const Icon(Icons.login),
-                              label: const Text('BELÉPÉS'),
-                            ),
-                          ] else ...[
-                            FilledButton.icon(
-                              onPressed: widget.onStart,
-                              icon: const Icon(Icons.play_arrow),
-                              label: const Text('ÚJ SZOLGÁLAT'),
-                            ),
-                            const SizedBox(height: 8),
-                            OutlinedButton.icon(
-                              onPressed: () => showLeaderboard(context,
-                                  widget.store),
-                              icon: const Icon(Icons.emoji_events_outlined),
-                              label: const Text('RANGLISTA'),
-                            ),
-                            const SizedBox(height: 8),
-                            OutlinedButton.icon(
-                              onPressed: () => showSettings(context,
-                                  widget.store),
-                              icon: const Icon(Icons.settings_outlined),
-                              label: const Text('BEÁLLÍTÁSOK'),
-                            ),
-                            TextButton(
-                              onPressed: widget.store.signOut,
-                              child: const Text('Vendégváltás'),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  )),
-                ],
+        child: LayoutBuilder(
+          builder: (context, constraints) => Stack(children: [
+            const Positioned.fill(
+              child: CustomPaint(painter: MenuScenePainter()),
+            ),
+            Positioned(
+              left: 16, top: 14,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(10, 7, 15, 7),
+                decoration: BoxDecoration(
+                  color: _panel,
+                  border: Border.all(color: const Color(0xFFF7FDFF), width: 2),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: const [BoxShadow(
+                    color: Color(0x66324D62), blurRadius: 12,
+                    offset: Offset(0, 4))],
+                ),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  CircleAvatar(
+                    backgroundColor: Color(0xFFFFD052),
+                    child: Icon(Icons.train_rounded,
+                        color: Color(0xFF164A75), size: 29),
+                  ),
+                  SizedBox(width: 8),
+                  Text('VÁGÁNYMESTER', style: TextStyle(
+                    fontSize: 20, fontWeight: FontWeight.w900,
+                    color: Colors.white, letterSpacing: .4)),
+                ]),
               ),
             ),
-          ),
+            Positioned(
+              left: 19, top: 91,
+              child: SizedBox(
+                width: constraints.maxWidth * .43,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _tag('🚆  ÚJ VASÚTI KALAND'),
+                    const SizedBox(height: 9),
+                    const Text('Légy te a\nforgalom mestere!',
+                      style: TextStyle(color: Color(0xFF173E65),
+                        fontSize: 27, height: 1.07,
+                        fontWeight: FontWeight.w900,
+                        shadows: [Shadow(color: Colors.white,
+                            blurRadius: 12)])),
+                    const SizedBox(height: 9),
+                    _tag('⭐ Pontgyűjtés   ❤️ 3 élet   🏆 Ranglista'),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              top: 76, right: 17, bottom: 13,
+              width: constraints.maxWidth < 850 ? 278 : 340,
+              child: Center(
+                child: SingleChildScrollView(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xF4F4FCFF),
+                      borderRadius: BorderRadius.circular(25),
+                      border: Border.all(color: Colors.white, width: 3),
+                      boxShadow: const [BoxShadow(
+                        color: Color(0x66364B59), blurRadius: 17,
+                        offset: Offset(0, 6))],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(loggedIn ? 'Üdv a központban!' : 'VENDÉG BELÉPÉS',
+                          style: const TextStyle(
+                            color: Color(0xFF154A76), fontSize: 19,
+                            fontWeight: FontWeight.w900)),
+                        const SizedBox(height: 4),
+                        Text(loggedIn ? widget.store.playerName! :
+                          'Adj meg egy nevet, és kezdődhet a szolgálat!',
+                          style: const TextStyle(
+                            color: Color(0xFF477B96), fontSize: 12)),
+                        const SizedBox(height: 12),
+                        if (!loggedIn) ...[
+                          TextField(
+                            controller: _name,
+                            maxLength: 20,
+                            textInputAction: TextInputAction.done,
+                            onSubmitted: _login,
+                            style: const TextStyle(color: Color(0xFF154A76)),
+                            decoration: const InputDecoration(
+                              labelText: 'Játékos neve',
+                              labelStyle: TextStyle(color: Color(0xFF52788F)),
+                              border: OutlineInputBorder(),
+                              counterText: '',
+                              prefixIcon: Icon(Icons.person_rounded,
+                                  color: Color(0xFF177FB5)),
+                            ),
+                          ),
+                          _mainButton('BELÉPÉS', Icons.login_rounded,
+                              () => _login(_name.text)),
+                        ] else ...[
+                          _mainButton('JÁTÉK INDÍTÁSA',
+                              Icons.play_arrow_rounded, widget.onStart),
+                          const SizedBox(height: 8),
+                          _secondaryButton('RANGLISTA',
+                              Icons.emoji_events_rounded,
+                              () => showLeaderboard(context, widget.store)),
+                          const SizedBox(height: 7),
+                          _secondaryButton('BEÁLLÍTÁSOK',
+                              Icons.settings_rounded,
+                              () => showSettings(context, widget.store)),
+                          TextButton(
+                            onPressed: widget.store.signOut,
+                            child: const Text('Vendégváltás',
+                              style: TextStyle(color: Color(0xFF356987))),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ]),
         ),
       ),
+    );
+  }
+
+  Widget _tag(String label) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+    decoration: BoxDecoration(
+      color: const Color(0xEAF4FCFF),
+      borderRadius: BorderRadius.circular(18),
+      boxShadow: const [BoxShadow(
+          color: Color(0x33295E87), blurRadius: 5)],
+    ),
+    child: Text(label, style: const TextStyle(
+      color: Color(0xFF15517F), fontSize: 11,
+      fontWeight: FontWeight.w800,
+    )),
+  );
+
+  Widget _mainButton(String text, IconData icon, VoidCallback action) {
+    return Container(
+      height: 52,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF7EF55D), Color(0xFF29C850)]),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [BoxShadow(
+          color: Color(0x6638B65A), blurRadius: 8, offset: Offset(0, 4))],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: action,
+          borderRadius: BorderRadius.circular(18),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: const Color(0xFF155B32), size: 29),
+              const SizedBox(width: 5),
+              Text(text, style: const TextStyle(
+                color: Color(0xFF155B32), fontSize: 16,
+                fontWeight: FontWeight.w900)),
+            ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _secondaryButton(String text, IconData icon,
+      VoidCallback action) {
+    return OutlinedButton.icon(
+      onPressed: action,
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(42),
+        backgroundColor: const Color(0xFFD8F1FF),
+        foregroundColor: const Color(0xFF16537F),
+        side: const BorderSide(color: Color(0xFF87BCE4), width: 2),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16)),
+      ),
+      icon: Icon(icon),
+      label: Text(text, style:
+          const TextStyle(fontWeight: FontWeight.w900)),
     );
   }
 

@@ -4,6 +4,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
 import 'simulation.dart';
+import 'playful_world.dart';
 
 const mapInk = Color(0xFFEAF8FF);
 const mapMuted = Color(0xFFA5C2CF);
@@ -52,9 +53,9 @@ class RailwayGame extends FlameGame with DragCallbacks, ScaleCallbacks {
   Future<void> onLoad() async {
     await super.onLoad();
     camera.viewfinder.position = Vector2(700, 325);
-    await world.add(TrackBackdrop(this));
+    await world.add(PlayfulWorld(simulation));
     for (final station in simulation.stations) {
-      await world.add(StationMarker(station, simulation, onStation));
+      await world.add(PlayfulStationMarker(station, simulation, onStation));
     }
     for (final train in simulation.trains) {
       final marker = TrainMarker(train, simulation, onTrain);
@@ -291,33 +292,60 @@ class TrainMarker extends PositionComponent with TapCallbacks {
   @override
   void render(Canvas canvas) {
     super.render(canvas);
-    final shell = RRect.fromRectAndRadius(
-        const Rect.fromLTWH(3, 5, 102, 43), const Radius.circular(12));
-    canvas.drawRRect(shell, Paint()..color = trainColor);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-          const Rect.fromLTWH(8, 9, 91, 18), const Radius.circular(6)),
-      Paint()..color = const Color(0xFF173040),
+    // High-contrast polished toy-train artwork, fully responsive to live
+    // train position and train type. No static gameplay screenshot.
+    canvas.drawOval(const Rect.fromLTWH(10, 45, 99, 10),
+      Paint()..color = const Color(0x66294457));
+    const shell = Rect.fromLTWH(3, 4, 102, 44);
+    final shape = RRect.fromRectAndCorners(
+      shell,
+      topLeft: const Radius.circular(14),
+      bottomLeft: const Radius.circular(14),
+      topRight: const Radius.circular(20),
+      bottomRight: const Radius.circular(20),
     );
+    final primary = trainColor;
+    canvas.drawRRect(shape, Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color.lerp(primary, Colors.white, .53)!,
+          primary, Color.lerp(primary, Colors.black, .27)!],
+        stops: const [0, .40, 1],
+      ).createShader(shell));
+    canvas.drawRRect(shape, Paint()
+      ..color = const Color(0xFFF9FFFF)
+      ..strokeWidth = 1.7..style = PaintingStyle.stroke);
+    // Roof rail, windows and lower stripe.
+    canvas.drawRRect(RRect.fromRectAndRadius(
+        const Rect.fromLTWH(11, 8, 85, 16), const Radius.circular(6)),
+      Paint()..color = const Color(0xFF23506D));
     for (var i = 0; i < 4; i++) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(13.0 + i * 22.0, 12, 16, 11),
-          const Radius.circular(3),
-        ),
-        Paint()..color = const Color(0xFF8DE7ED),
-      );
+      final glass = Rect.fromLTWH(14.0 + i * 20, 10, 14, 12);
+      canvas.drawRRect(RRect.fromRectAndRadius(
+          glass, const Radius.circular(3)),
+        Paint()..shader = const LinearGradient(
+          colors: [Color(0xFFB4F7FD), Color(0xFF3B90CB)],
+          begin: Alignment.topLeft, end: Alignment.bottomRight,
+        ).createShader(glass));
     }
-    canvas.drawCircle(const Offset(21, 48), 5,
-        Paint()..color = const Color(0xFF0C1A26));
-    canvas.drawCircle(const Offset(87, 48), 5,
-        Paint()..color = const Color(0xFF0C1A26));
-    _drawText(canvas, train.number, const Offset(24, 29),
-        color: const Color(0xFF10222F), fontSize: 14, bold: true);
+    canvas.drawLine(const Offset(9, 32), const Offset(100, 32),
+      Paint()..color = const Color(0xFFF8FFEC)
+        ..strokeWidth = 3..strokeCap = StrokeCap.round);
+    // Wheels, headlamp and identification.
+    for (final x in <double>[21, 84]) {
+      canvas.drawCircle(Offset(x, 47), 5,
+          Paint()..color = const Color(0xFF29445A));
+      canvas.drawCircle(Offset(x, 47), 2,
+          Paint()..color = const Color(0xFFCEDAE1));
+    }
+    canvas.drawCircle(const Offset(99, 33), 4,
+        Paint()..color = const Color(0xFFFFF1A2));
+    _drawText(canvas, train.number, const Offset(19, 27),
+        color: const Color(0xFF12334D), fontSize: 14, bold: true);
     if (train.moving) {
-      canvas.drawCircle(
-        const Offset(103, 10), 5, Paint()..color = mapInk,
-      );
+      canvas.drawCircle(const Offset(101, 5), 5,
+          Paint()..color = const Color(0xFF93FF9A));
     }
   }
 }

@@ -1,5 +1,8 @@
 # VÁGÁNYMESTER Mobile
 
+**0.3.0 frissítés:** világos, eredeti rajzolt casual-játékvilág, új főmenü és HUD, modern vonatok, kényelmes vezérlés. Részletek: [ART_DIRECTION.md](ART_DIRECTION.md).
+
+
 A WPF-játék mellett fejlődő, fekvő tájolású Flutter + Flame vasúti
 forgalomirányító játék. A WPF-kód változatlanul elérhető a gyökérben.
 

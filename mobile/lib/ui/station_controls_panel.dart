@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../game/simulation.dart';
 
-const _mint = Color(0xFF35DDC3);
+const _mint = Color(0xFF177DAA);
 const _danger = Color(0xFFF16A74);
 
 /// WPF-szerű állomási kezelőpult, a szimulációs motort vezérli.
