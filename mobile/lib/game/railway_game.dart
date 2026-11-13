@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
@@ -28,6 +30,20 @@ class RailwayGame extends FlameGame with DragCallbacks, ScaleCallbacks {
   final void Function(String trainNumber) onTrain;
   final List<TrainMarker> markers = [];
   double _gestureStartZoom = 1;
+
+  /// The consumable assistance system may highlight one actual train.
+  /// The hint never changes or bypasses the underlying simulation.
+  void highlightTrain(String? number) {
+    for (final marker in markers) {
+      marker.hintHighlighted = marker.train.number == number;
+    }
+    if (number != null) {
+      final train = simulation.train(number);
+      camera.viewfinder.position = Vector2(
+        simulation.mapPosition(train), simulation.mapHeight(train),
+      );
+    }
+  }
 
   @override
   void onScaleStart(ScaleStartEvent event) {
@@ -272,6 +288,8 @@ class TrainMarker extends PositionComponent with TapCallbacks {
   final SimTrain train;
   final RailwaySimulation simulation;
   final void Function(String) onSelect;
+  bool hintHighlighted = false;
+  double _hintPulse = 0;
 
   Color get trainColor => switch (train.kind) {
     TrainKind.intercity => const Color(0xFFFFC977),
@@ -282,6 +300,7 @@ class TrainMarker extends PositionComponent with TapCallbacks {
   @override
   void update(double dt) {
     super.update(dt);
+    if (hintHighlighted) _hintPulse += dt;
     position.setValues(simulation.mapPosition(train) - 54,
         simulation.mapHeight(train) - 26);
   }
@@ -292,6 +311,27 @@ class TrainMarker extends PositionComponent with TapCallbacks {
   @override
   void render(Canvas canvas) {
     super.render(canvas);
+    if (hintHighlighted) {
+      final pulse = (1 + math.sin(_hintPulse * 6)) * .5;
+      final spread = 4.0 + pulse * 7;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(0 - spread, 0 - spread,
+            size.x + spread * 2, size.y + spread * 2),
+          const Radius.circular(19),
+        ),
+        Paint()..color = const Color(0xFFFFCA40).withAlpha(
+          (65 + pulse * 100).round()),
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          const Rect.fromLTWH(1, 1, 106, 52),
+          const Radius.circular(15)),
+        Paint()..color = const Color(0xFFFFDD59)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3.5,
+      );
+    }
     // High-contrast polished toy-train artwork, fully responsive to live
     // train position and train type. No static gameplay screenshot.
     canvas.drawOval(const Rect.fromLTWH(10, 45, 99, 10),

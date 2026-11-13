@@ -39,18 +39,12 @@ jobs:
         working-directory: mobile
         run: flutter create --platforms=android --org hu.merenyimiklos --project-name vaganymester .
 
-      - name: Force Android landscape orientation
+      - name: Generate VAGANYMESTER launcher icons
         working-directory: mobile
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          manifest = Path("android/app/src/main/AndroidManifest.xml")
-          source = manifest.read_text()
-          old = 'android:name=".MainActivity"'
-          assert old in source, "MainActivity declaration not found"
-          manifest.write_text(source.replace(
-              old, old + ' android:screenOrientation="sensorLandscape"'))
-          PY
+          python3 -m venv "$RUNNER_TEMP/launcher-icon-venv"
+          "$RUNNER_TEMP/launcher-icon-venv/bin/python" -m pip install --quiet pillow==11.3.0 cairosvg==2.8.2
+          "$RUNNER_TEMP/launcher-icon-venv/bin/python" tool/generate_launcher_icons.py
 
       - name: Install dependencies
         working-directory: mobile
@@ -66,7 +60,7 @@ jobs:
 
       - name: Build release APK
         working-directory: mobile
-        run: flutter build apk --release --build-name 0.4.0 --build-number ${{ github.run_number }}
+        run: flutter build apk --release --build-name 0.5.0 --build-number ${{ github.run_number }}
 
       - name: Upload installable APK
         uses: actions/upload-artifact@v4

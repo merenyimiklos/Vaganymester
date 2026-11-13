@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../game/level_catalog.dart';
 import '../game/campaign_progress.dart';
+import '../game/help_inventory.dart';
 
 class ScoreEntry {
   const ScoreEntry(this.name, this.points, this.when);
@@ -31,8 +32,10 @@ class SessionStore extends ChangeNotifier {
   int speed = 30;
   List<ScoreEntry> leaderboard = [];
   CampaignProgress campaign = CampaignProgress();
+  HelpInventory helpInventory = HelpInventory();
 
   String get _campaignKey => 'campaign_progress:' + (playerName ?? 'guest');
+  String get _helpKey => 'help_inventory:' + (playerName ?? 'guest');
 
   Future<void> load() async {
     playerName = await _prefs.getString('profile_name');
@@ -41,6 +44,7 @@ class SessionStore extends ChangeNotifier {
     showHints = await _prefs.getBool('setting_hints') ?? true;
     speed = await _prefs.getInt('setting_speed') ?? 30;
     await _loadCampaign();
+    await _loadHelps();
     final entries = await _prefs.getStringList('scores') ?? [];
     leaderboard = [];
     for (final raw in entries) {
@@ -73,12 +77,47 @@ class SessionStore extends ChangeNotifier {
     }
   }
 
+  Future<void> _loadHelps() async {
+    helpInventory = HelpInventory();
+    final raw = await _prefs.getString(_helpKey);
+    if (raw == null) return;
+    try {
+      helpInventory = HelpInventory.fromJson(
+        jsonDecode(raw) as Map<String, dynamic>,
+      );
+    } on FormatException {
+      helpInventory = HelpInventory();
+    } on TypeError {
+      helpInventory = HelpInventory();
+    }
+  }
+
+  Future<void> _saveHelps() async {
+    await _prefs.setString(_helpKey, jsonEncode(helpInventory.toJson()));
+    notifyListeners();
+  }
+
+  /// Opening an earned, offline chest gives two guaranteed help items.
+  Future<List<HelpType>> openHelpChest() async {
+    final contents = helpInventory.openChest();
+    if (contents.isNotEmpty) await _saveHelps();
+    return contents;
+  }
+
+  /// Charge only after an actionable advisory hint was found.
+  Future<bool> spendHelp(HelpType type) async {
+    if (!helpInventory.consume(type)) return false;
+    await _saveHelps();
+    return true;
+  }
+
   Future<void> enter(String name) async {
     final safe = name.trim();
     if (safe.isEmpty) return;
     playerName = safe.substring(0, safe.length > 20 ? 20 : safe.length);
     await _prefs.setString('profile_name', playerName!);
     await _loadCampaign();
+    await _loadHelps();
     notifyListeners();
   }
 
@@ -86,6 +125,7 @@ class SessionStore extends ChangeNotifier {
     playerName = null;
     await _prefs.remove('profile_name');
     campaign = CampaignProgress();
+    helpInventory = HelpInventory();
     notifyListeners();
   }
 
@@ -113,7 +153,11 @@ class SessionStore extends ChangeNotifier {
 
   Future<void> finishLevel(GameLevel level, int stars, int points) async {
     if (!campaign.isUnlocked(level)) return;
+    final firstClear = campaign.starsFor(level) == 0 && stars > 0;
     campaign.award(level, stars);
+    if (firstClear && helpInventory.earnChest(level.id)) {
+      await _saveHelps();
+    }
     await _prefs.setString(_campaignKey,
         jsonEncode(campaign.toJson()));
     await recordScore(points);

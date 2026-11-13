@@ -1,12 +1,17 @@
+import 'dart:async';
+
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
 import '../game/railway_game.dart';
 import '../game/simulation.dart';
 import '../game/level_catalog.dart';
+import '../game/help_inventory.dart';
+import '../game/help_advisor.dart';
 import '../data/session_store.dart';
 import 'main_menu.dart';
 import 'station_controls_panel.dart';
+import 'help_center_sheet.dart';
 
 const _surface = Color(0xFFF6FCFF);
 const _muted = Color(0xFF49738D);
@@ -35,6 +40,10 @@ class _DispatchScreenState extends State<DispatchScreen> {
   String selectedStationId = 'korospatak';
   String? selectedTrainId;
   bool _scoreRecorded = false;
+  bool _missionsExpanded = false;
+  HelpSuggestion? _activeHint;
+  String? _notice;
+  Timer? _noticeTimer;
 
   @override
   void initState() {
@@ -53,6 +62,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
 
   @override
   void dispose() {
+    _noticeTimer?.cancel();
     simulation.removeListener(_checkGameOver);
     simulation.dispose();
     super.dispose();
@@ -181,11 +191,141 @@ class _DispatchScreenState extends State<DispatchScreen> {
     simulation.setMultiplier(widget.store.speed);
   }
 
-  void _warn(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text)),
+  void _warn(String message) {
+    _noticeTimer?.cancel();
+    if (!mounted) return;
+    setState(() => _notice = message);
+    _noticeTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _notice = null);
+    });
+  }
+
+  void _openHelpCenter() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.sizeOf(context).height * .88,
+          child: HelpCenterSheet(
+            store: widget.store,
+            onUse: _useHelp,
+          ),
+        ),
+      ),
     );
   }
+
+  Future<void> _useHelp(HelpType type) async {
+    final hint = const RailwayHelpAdvisor().suggest(
+      simulation, type, preferredTrain: selectedTrainId,
+    );
+    if (hint == null) {
+      _warn(simulation.automatic
+          ? 'Kézi irányításnál használhatsz segítséget. Kapcsold ki az automatát!'
+          : 'Most nincs szabad indulási helyzet. Várd meg, míg felszabadul a pálya!');
+      return;
+    }
+    if (!await widget.store.spendHelp(type)) {
+      if (mounted) _warn('Ebből a segítségből most nincs készleted.');
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      selectedTrainId = hint.trainNumber;
+      selectedStationId = hint.stationId;
+      _activeHint = hint;
+    });
+    game.highlightTrain(hint.trainNumber);
+  }
+
+  void _clearHint() {
+    game.highlightTrain(null);
+    setState(() => _activeHint = null);
+  }
+
+  void _openHintTarget() {
+    final hint = _activeHint;
+    if (hint == null) return;
+    setState(() {
+      selectedStationId = hint.stationId;
+      selectedTrainId = hint.focus == HintFocus.departure
+          ? hint.trainNumber : null;
+    });
+    _showInfoSheet();
+  }
+
+  Widget _hintBanner(bool compact) {
+    final hint = _activeHint!;
+    return Material(
+      color: const Color(0xFFFFF5C9),
+      elevation: 8,
+      shadowColor: const Color(0xFFFFB833),
+      borderRadius: BorderRadius.circular(17),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(17),
+          border: Border.all(color: const Color(0xFFFFBD35), width: 3),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.ads_click_rounded,
+            color: Color(0xFFDA8811), size: 25),
+          const SizedBox(width: 6),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(hint.title, maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Color(0xFF68470F),
+                  fontWeight: FontWeight.w900, fontSize: 12)),
+              Text(hint.detail, maxLines: compact ? 2 : 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Color(0xFF735926),
+                  fontSize: 10)),
+            ],
+          )),
+          const SizedBox(width: 5),
+          TextButton(
+            onPressed: _openHintTarget,
+            child: const Text('MUTASD',
+              style: TextStyle(color: Color(0xFF985B04),
+                  fontWeight: FontWeight.w900, fontSize: 10)),
+          ),
+          IconButton(
+            onPressed: _clearHint,
+            tooltip: 'Segítség bezárása',
+            icon: const Icon(Icons.close_rounded,
+              color: Color(0xFF936B30), size: 19),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _noticeBanner() {
+    return Material(
+      elevation: 7,
+      color: const Color(0xFF1C5379),
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.info_outline_rounded,
+              color: Color(0xFFFFCF65), size: 19),
+          const SizedBox(width: 8),
+          Flexible(child: Text(_notice!,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white,
+                fontSize: 12, fontWeight: FontWeight.w700))),
+        ]),
+      ),
+    );
+  }
+
 
   Future<void> _unsafe(String number) async {
     final confirm = await showDialog<bool>(
@@ -303,6 +443,20 @@ class _DispatchScreenState extends State<DispatchScreen> {
                   bottom: 9,
                   child: _navigation(compact),
                 ),
+                if (_activeHint != null)
+                  Positioned(
+                    top: compact ? 139 : 85,
+                    left: compact ? 9 : 255,
+                    right: compact ? 9 : 420,
+                    child: _hintBanner(compact),
+                  ),
+                if (_notice != null)
+                  Positioned(
+                    top: _activeHint == null ? 128 : 219,
+                    left: compact ? 80 : 305,
+                    right: compact ? 80 : 305,
+                    child: _noticeBanner(),
+                  ),
                 if (widget.store.showHints && !compact)
                   Positioned(
                     right: 205, bottom: 92,
@@ -425,34 +579,57 @@ class _DispatchScreenState extends State<DispatchScreen> {
   }
 
   Widget _missions(bool compact) {
-    final height = compact ? 125.0 : 151.0;
-    return SizedBox(
-      width: compact ? 194 : 238,
-      height: height,
-      child: _playfulCard(
-        padding: const EdgeInsets.fromLTRB(9, 9, 9, 6),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(children: [
-              Icon(Icons.fact_check_rounded, color: Color(0xFF2788BB),
-                size: 20),
-              SizedBox(width: 6),
-              Text('MAI FELADATOK',
-                style: TextStyle(color: Color(0xFF153E62),
-                    fontSize: 12, fontWeight: FontWeight.w900)),
-            ]),
-            const Divider(height: 10),
-            _missionRow('Sikeres menetek', simulation.completedLegs,
-                widget.level.requiredArrivals,
-                const Color(0xFF31CC83)),
-            _missionRow('Gyűjts pontokat', simulation.score,
-                widget.level.requiredArrivals * 120,
-                const Color(0xFFFFB93B)),
-            if (!compact)
-              _missionRow('Balesetmentes', 3 - simulation.collisionCount, 3,
-                  const Color(0xFF459DDF)),
-          ],
+    final target = widget.level.requiredArrivals;
+    final amount = simulation.completedLegs.clamp(0, target);
+    return GestureDetector(
+      onTap: () => setState(() => _missionsExpanded = !_missionsExpanded),
+      child: SizedBox(
+        width: compact ? 188 : 228,
+        child: _playfulCard(
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                const Icon(Icons.fact_check_rounded,
+                    color: Color(0xFF2788BB), size: 18),
+                const SizedBox(width: 5),
+                const Expanded(child: Text('MAI FELADATOK',
+                  style: TextStyle(color: Color(0xFF153E62),
+                    fontSize: 11, fontWeight: FontWeight.w900))),
+                Icon(_missionsExpanded ? Icons.expand_less : Icons.expand_more,
+                  color: const Color(0xFF275A85), size: 19),
+              ]),
+              const SizedBox(height: 5),
+              if (!_missionsExpanded)
+                Row(children: [
+                  Expanded(child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: amount / target, minHeight: 7,
+                      backgroundColor: const Color(0xFFD2E5F2),
+                      valueColor: const AlwaysStoppedAnimation(
+                        Color(0xFF35CB82)),
+                    ),
+                  )),
+                  const SizedBox(width: 6),
+                  Text(amount.toString() + '/' + target.toString(),
+                    style: const TextStyle(
+                      color: Color(0xFF20537C), fontSize: 11,
+                      fontWeight: FontWeight.w900)),
+                ])
+              else ...[
+                const Divider(height: 10),
+                _missionRow('Sikeres menetek', simulation.completedLegs,
+                  target, const Color(0xFF31CC83)),
+                _missionRow('Gyűjts pontokat', simulation.score,
+                  target * 120, const Color(0xFFFFB93B)),
+                _missionRow('Balesetmentes', 3 - simulation.collisionCount,
+                  3, const Color(0xFF459DDF)),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -484,48 +661,111 @@ class _DispatchScreenState extends State<DispatchScreen> {
   }
 
   Widget _tools(bool compact) {
-    return Column(mainAxisSize: MainAxisSize.min, children: [
+    return Row(mainAxisSize: MainAxisSize.min, children: [
       _squareAction(icon: Icons.settings_rounded,
-          tooltip: 'Beállítások', onTap: _openSettings),
-      const SizedBox(height: 7),
+        tooltip: 'Beállítások', onTap: _openSettings),
+      const SizedBox(width: 5),
       _squareAction(icon: simulation.running
           ? Icons.pause_rounded : Icons.play_arrow_rounded,
-        tooltip: 'Szünet / Indítás',
+        tooltip: 'Szünet / folytatás',
         onTap: () => simulation.setRunning(!simulation.running)),
-      const SizedBox(height: 7),
-      _squareAction(icon: Icons.speed_rounded,
-        tooltip: 'Sebesség: ' + simulation.timeMultiplier.toString() + '×',
+      const SizedBox(width: 5),
+      _speedControl(),
+      const SizedBox(width: 5),
+      _helpAction(),
+      const SizedBox(width: 5),
+      _squareAction(icon: simulation.automatic
+          ? Icons.smart_toy_rounded : Icons.tune_rounded,
+        tooltip: 'Automatikus / kézi forgalom',
         onTap: () {
-          const speeds = [1, 10, 30, 60];
-          final idx = speeds.indexOf(simulation.timeMultiplier);
-          final next = speeds[(idx + 1) % speeds.length];
-          simulation.setMultiplier(next);
-          widget.store.setSpeed(next);
-          _warn('Szimulációs sebesség: ' + next.toString() + '×');
+          simulation.setAutomatic(!simulation.automatic);
+          widget.store.setAuto(simulation.automatic);
         }),
-      const SizedBox(height: 7),
       if (!compact) ...[
-        _squareAction(icon: simulation.automatic
-            ? Icons.smart_toy_rounded : Icons.tune_rounded,
-          tooltip: 'Automatikus / Kézi forgalom',
-          onTap: () {
-            simulation.setAutomatic(!simulation.automatic);
-            widget.store.setAuto(simulation.automatic);
-          }),
-        const SizedBox(height: 7),
-        const SizedBox(height: 7),
-        _squareAction(icon: Icons.zoom_in_map_rounded,
-            tooltip: 'Nagyítás', onTap: () => game.zoom(1.25)),
-        const SizedBox(height: 7),
-        _squareAction(icon: Icons.zoom_out_map_rounded,
-            tooltip: 'Kicsinyítés', onTap: () => game.zoom(.8)),
+        const SizedBox(width: 5),
+        _squareAction(icon: Icons.zoom_in_rounded,
+          tooltip: 'Nagyítás', onTap: () => game.zoom(1.25)),
+        const SizedBox(width: 5),
+        _squareAction(icon: Icons.zoom_out_rounded,
+          tooltip: 'Kicsinyítés', onTap: () => game.zoom(.8)),
       ],
-      const SizedBox(height: 7),
+      const SizedBox(width: 5),
       _squareAction(icon: Icons.warning_amber_rounded,
-        tooltip: simulation.emergency ? 'Vészleállítás feloldása' :
-            'Vészleállítás',
+        tooltip: simulation.emergency
+            ? 'Vészleállítás feloldása' : 'Vészleállítás',
         danger: simulation.emergency,
         onTap: () => simulation.setEmergency(!simulation.emergency)),
+    ]);
+  }
+
+  Widget _speedControl() {
+    final current = simulation.timeMultiplier;
+    return PopupMenuButton<int>(
+      tooltip: 'Játéksebesség: ' + current.toString() + '×',
+      initialValue: current,
+      onSelected: (next) {
+        simulation.setMultiplier(next);
+        widget.store.setSpeed(next);
+        _warn('Játéksebesség: ' + next.toString() + '×');
+      },
+      itemBuilder: (_) => [
+        for (final speed in const [1, 10, 30, 60])
+          PopupMenuItem<int>(
+            value: speed,
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              if (speed == current) const Icon(Icons.check_rounded, size: 18),
+              const SizedBox(width: 6),
+              Text(speed.toString() + '×',
+                style: const TextStyle(fontWeight: FontWeight.w800)),
+            ]),
+          ),
+      ],
+      child: Container(
+        width: 57, height: 43,
+        decoration: BoxDecoration(
+          color: const Color(0xFFE9F8FF),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white, width: 2),
+          boxShadow: const [BoxShadow(
+            color: Color(0x55253B61), blurRadius: 5,
+            offset: Offset(0, 3))],
+        ),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.speed_rounded,
+              color: Color(0xFF155783), size: 17),
+            Text(current.toString() + '×', style: const TextStyle(
+              color: Color(0xFF155783), height: 1.1,
+              fontSize: 14, fontWeight: FontWeight.w900)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _helpAction() {
+    final stock = widget.store.helpInventory;
+    return Stack(clipBehavior: Clip.none, children: [
+      _squareAction(icon: Icons.lightbulb_rounded,
+        tooltip: 'Segítségek: ' + stock.totalItems.toString() +
+            ', ládák: ' + stock.chests.toString(),
+        onTap: _openHelpCenter),
+      Positioned(right: -3, top: -5,
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+          decoration: BoxDecoration(
+            color: stock.chests > 0
+              ? const Color(0xFFFFCA43) : const Color(0xFF33BCCD),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white, width: 1.5),
+          ),
+          child: Text(stock.chests > 0 ? '🎁' : stock.totalItems.toString(),
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Color(0xFF174A72),
+              fontSize: 10, fontWeight: FontWeight.w900)),
+        ),
+      ),
     ]);
   }
 
@@ -827,6 +1067,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
         simulation: simulation,
         station: station,
         onRejected: _warn,
+        hint: _activeHint,
         onAutomatic: (enabled) {
           simulation.setAutomatic(enabled);
           widget.store.setAuto(enabled);

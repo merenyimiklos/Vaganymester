@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../game/simulation.dart';
+import '../game/help_advisor.dart';
 
 const _mint = Color(0xFF177DAA);
 const _danger = Color(0xFFF16A74);
@@ -12,12 +13,16 @@ class StationControlsPanel extends StatelessWidget {
     required this.station,
     required this.onRejected,
     required this.onAutomatic,
+    this.hint,
   });
 
   final RailwaySimulation simulation;
   final RailwayStation station;
   final void Function(String) onRejected;
   final ValueChanged<bool> onAutomatic;
+  final HelpSuggestion? hint;
+
+  bool get _showHint => hint != null && hint!.stationId == station.id;
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +32,24 @@ class StationControlsPanel extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (_showHint) Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(11),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF3C8),
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: const Color(0xFFFFC244), width: 3),
+          ),
+          child: Row(children: [
+            const Icon(Icons.ads_click_rounded,
+                color: Color(0xFFD48B00), size: 27),
+            const SizedBox(width: 8),
+            Expanded(child: Text(hint!.detail,
+                style: const TextStyle(color: Color(0xFF714A00),
+                    fontSize: 12, fontWeight: FontWeight.w800))),
+          ]),
+        ),
         Text(station.name, style: const TextStyle(
             fontSize: 22, fontWeight: FontWeight.w800)),
         Text('Peronfoglaltság: ' +
@@ -90,6 +113,13 @@ class StationControlsPanel extends StatelessWidget {
           children: [
             for (var index = 0; index < station.platforms; index++)
               ChoiceChip(
+                backgroundColor: _showHint &&
+                    hint!.focus == HintFocus.turnout &&
+                    hint!.side == side && hint!.track == index
+                    ? const Color(0xFFFFE59A) : null,
+                elevation: _showHint && hint!.focus == HintFocus.turnout &&
+                    hint!.side == side && hint!.track == index ? 7 : 0,
+                shadowColor: const Color(0xFFFFA51B),
                 selected: index == current,
                 label: Text((index + 1).toString()),
                 onSelected: disabled ? null : (_) {
@@ -113,9 +143,21 @@ class StationControlsPanel extends StatelessWidget {
   Widget _signalButton(RailwaySide side, SignalKind kind, String title,
       StationControls c, bool disabled) {
     final green = c.signal(side, kind);
+    final focus = kind == SignalKind.entry
+        ? HintFocus.entrySignal : HintFocus.exitSignal;
+    final highlighted = _showHint && hint!.focus == focus &&
+        hint!.side == side;
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(
+          backgroundColor: highlighted ? const Color(0xFFFFE59A) : null,
+          side: highlighted
+              ? const BorderSide(color: Color(0xFFFFB11B), width: 3)
+              : null,
+          elevation: highlighted ? 5 : 0,
+          shadowColor: const Color(0xFFFFA51B),
+        ),
         onPressed: disabled ? null : () {
           if (!simulation.setSignal(station.id, side, kind, !green)) {
             onRejected('Nem állítható szabadra: foglalt vagy lezárt vágányút.');
