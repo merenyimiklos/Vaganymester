@@ -270,12 +270,16 @@ class _DispatchScreenState extends State<DispatchScreen> {
   }
 
   Future<void> _openSettings() async {
+    final wasRunning = simulation.running;
+    simulation.setRunning(false);
     await showSettings(context, widget.store);
     if (!mounted) return;
     simulation.setAutomatic(_tutorial?.active == true
         ? false : widget.store.autoDispatch);
     simulation.setRiskMode(widget.store.riskMode);
     simulation.setMultiplier(widget.store.speed);
+    simulation.setRunning(wasRunning);
+    setState(() {});
   }
 
   void _warn(String message) {
@@ -1312,6 +1316,10 @@ class _DispatchScreenState extends State<DispatchScreen> {
               }
               if (!simulation.authorize(train.number)) {
                 _warn(GameL10n.tr('Ez a vonat nem indítható.'));
+              } else if (train.number == 'S 2412' &&
+                  _tutorial?.step == TutorialStep.departTrain) {
+                _advanceTutorial(TutorialAction.dispatchedTrain);
+                Navigator.of(context).pop();
               }
             },
             icon: const Icon(Icons.check_circle_outline),
