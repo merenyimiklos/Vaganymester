@@ -6,6 +6,8 @@ import 'game/level_catalog.dart';
 import 'ui/dispatch_screen.dart';
 import 'ui/campaign_screen.dart';
 import 'ui/main_menu.dart';
+import 'ui/academy_screen.dart';
+import 'services/audio_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,6 +51,8 @@ class HomeGate extends StatefulWidget {
 
 class _HomeGateState extends State<HomeGate> {
   final SessionStore store = SessionStore();
+  late final GameAudio audio = GameAudio(store);
+  bool academyShowing = false;
   bool loaded = false;
   bool playing = false;
   bool selecting = false;
@@ -62,11 +66,13 @@ class _HomeGateState extends State<HomeGate> {
 
   Future<void> _load() async {
     await store.load();
+    audio.showMenu();
     if (mounted) setState(() => loaded = true);
   }
 
   @override
   void dispose() {
+    audio.dispose();
     store.dispose();
     super.dispose();
   }
@@ -84,15 +90,39 @@ class _HomeGateState extends State<HomeGate> {
             key: ValueKey(currentLevel!.id),
             level: currentLevel!,
             store: store,
-            onExit: () => setState(() {
+            audio: audio,
+            onExit: () {
+              audio.showMenu();
+              setState(() {
               playing = false;
               selecting = true;
-            }),
-            onNext: (level) => setState(() {
+              });
+            },
+            onNext: (level) {
+              audio.showGame();
+              setState(() {
               currentLevel = level;
               playing = true;
               selecting = false;
-            }),
+              });
+            },
+          );
+        }
+        if (academyShowing) {
+          return AcademyScreen(
+            store: store,
+            audio: audio,
+            onBack: () {
+              audio.showMenu();
+              setState(() => academyShowing = false);
+            },
+            onCampaign: () {
+              audio.showMenu();
+              setState(() {
+                academyShowing = false;
+                selecting = true;
+              });
+            },
           );
         }
         if (selecting) {
@@ -111,7 +141,14 @@ class _HomeGateState extends State<HomeGate> {
         }
         return MainMenu(
           store: store,
-          onStart: () => setState(() => selecting = true),
+          onStart: () => setState(() {
+            if (store.academy.campaignUnlocked) {
+              selecting = true;
+            } else {
+              academyShowing = true;
+            }
+          }),
+          onTutorial: () => setState(() => academyShowing = true),
         );
       },
     );

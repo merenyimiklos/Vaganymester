@@ -17,6 +17,8 @@ import '../data/session_store.dart';
 import 'main_menu.dart';
 import 'station_controls_panel.dart';
 import 'help_center_sheet.dart';
+import 'game_alert.dart';
+import '../services/audio_service.dart';
 
 const _surface = Color(0xFFF6FCFF);
 const _muted = Color(0xFF49738D);
@@ -29,8 +31,10 @@ class DispatchScreen extends StatefulWidget {
     required this.onExit,
     required this.onNext,
     required this.level,
+    required this.audio,
   });
   final SessionStore store;
+  final GameAudio audio;
   final VoidCallback onExit;
   final ValueChanged<GameLevel> onNext;
   final GameLevel level;
@@ -53,17 +57,18 @@ class _DispatchScreenState extends State<DispatchScreen> {
   bool _tutorialFinishedNotice = false;
   bool _hazardSeen = false;
   bool _hazardShowing = false;
+  bool _previousMoving = false;
 
   @override
   void initState() {
     super.initState();
-    if (widget.level.id == 'hu-1') _tutorial = TutorialGuide();
     simulation = RailwaySimulation(level: widget.level)
       ..setAutomatic(_tutorial == null ? widget.store.autoDispatch : false)
       ..setRiskMode(widget.store.riskMode)
       ..setMultiplier(widget.store.speed);
     if (_tutorial != null) simulation.setRunning(false);
     simulation.addListener(_onSimulationUpdate);
+    widget.audio.showGame();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _tutorial == null &&
           !widget.store.introducedLevels.contains(widget.level.id)) {
@@ -81,19 +86,27 @@ class _DispatchScreenState extends State<DispatchScreen> {
   void dispose() {
     _noticeTimer?.cancel();
     simulation.removeListener(_onSimulationUpdate);
+    widget.audio.setMoving(false);
     simulation.dispose();
     _tutorial?.dispose();
     super.dispose();
   }
 
   void _onSimulationUpdate() {
+    final moving = simulation.running && !simulation.emergency &&
+        simulation.movingCount > 0;
+    widget.audio.setMoving(moving);
+    if (moving && !_previousMoving) unawaited(widget.audio.horn());
+    _previousMoving = moving;
     if (_tutorial?.step == TutorialStep.waitForArrival &&
         simulation.train('S 2412').completedLegs >= 1) {
       _advanceTutorial(TutorialAction.firstArrival);
     }
     if (simulation.hasHazard && !_hazardSeen) {
       _hazardSeen = true;
+      widget.audio.haptic(HapticStyle.warning);
       _warn(GameL10n.tr('Gyalogos a síneken!'));
+
     }
     if (_hazardShowing != simulation.hasHazard) {
       _hazardShowing = simulation.hasHazard;
@@ -157,6 +170,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
   void _checkGameOver() {
     if (_scoreRecorded) return;
     if (simulation.levelComplete) {
+      unawaited(widget.audio.success());
       _scoreRecorded = true;
       widget.store.finishLevel(
         widget.level, simulation.earnedStars, simulation.score,
@@ -286,7 +300,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
     _noticeTimer?.cancel();
     if (!mounted) return;
     setState(() => _notice = message);
-    _noticeTimer = Timer(const Duration(seconds: 3), () {
+    _noticeTimer = Timer(const Duration(seconds: 6), () {
       if (mounted) setState(() => _notice = null);
     });
   }
@@ -453,23 +467,18 @@ class _DispatchScreenState extends State<DispatchScreen> {
   }
 
   Widget _noticeBanner() {
-    return Material(
-      elevation: 7,
-      color: const Color(0xFF1C5379),
-      borderRadius: BorderRadius.circular(20),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.info_outline_rounded,
-              color: Color(0xFFFFCF65), size: 19),
-          const SizedBox(width: 8),
-          Flexible(child: Text(_notice!,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white,
-                fontSize: 12, fontWeight: FontWeight.w700))),
-        ]),
-      ),
+    final message = _notice!;
+    final danger = message.contains('VÉSZ') || message.contains('ÜTKÖZ');
+    final warning = !danger && (message.contains('nem') ||
+        message.contains('foglalt') || message.contains('veszély'));
+    return GameAlertCard(
+      message: message,
+      style: danger ? GameAlertStyle.danger :
+          warning ? GameAlertStyle.warning : GameAlertStyle.info,
+      onClose: () {
+        _noticeTimer?.cancel();
+        if (mounted) setState(() => _notice = null);
+      },
     );
   }
 
@@ -1176,6 +1185,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
     if (train.number == 'S 2412') {
       _advanceTutorial(TutorialAction.dispatchedTrain);
     }
+    widget.audio.haptic(HapticStyle.tap);
     _warn(train.number + ': indulási engedély rögzítve.');
   }
 

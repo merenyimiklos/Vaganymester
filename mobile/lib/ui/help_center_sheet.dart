@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/session_store.dart';
 import '../game/help_inventory.dart';
+import '../game/academy_progress.dart';
 import '../l10n/game_l10n.dart';
 
 /// The chest shelf and consumable help library. No payments or chance-based
@@ -22,6 +23,7 @@ class HelpCenterSheet extends StatefulWidget {
 
 class _HelpCenterSheetState extends State<HelpCenterSheet> {
   List<HelpType> _lastRewards = const [];
+  String? _purchaseMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -102,6 +104,14 @@ class _HelpCenterSheetState extends State<HelpCenterSheet> {
                   ]),
                 ),
               ),
+              if (_purchaseMessage != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 7),
+                  child: Text(_purchaseMessage!,
+                    style: const TextStyle(color: Color(0xFF175D77),
+                      fontSize: 12, fontWeight: FontWeight.w900)),
+                ),
+              _shopCard(),
               if (_lastRewards.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 9),
@@ -132,6 +142,71 @@ class _HelpCenterSheetState extends State<HelpCenterSheet> {
           ),
         );
       },
+    );
+  }
+
+  Widget _shopCard() {
+    final progress = widget.store.academy;
+    final cost = AcademyProgress.chestPrice;
+    final language = widget.store.language;
+    final title = switch (language) {
+      'en' => 'ACADEMY POINT SHOP',
+      'de' => 'LERNPUNKTE-SHOP',
+      _ => 'AKADÉMIA PONTBOLT',
+    };
+    final buy = switch (language) {
+      'en' => 'BUY CHEST',
+      'de' => 'KISTE KAUFEN',
+      _ => 'LÁDA VÁSÁRLÁSA',
+    };
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE2F5FF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF89D1EF), width: 2),
+      ),
+      child: Row(children: [
+        const CircleAvatar(
+          backgroundColor: Color(0xFFFFD778),
+          child: Icon(Icons.storefront_rounded,
+            color: Color(0xFF976313))),
+        const SizedBox(width: 10),
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(color: Color(0xFF174A70),
+              fontSize: 13, fontWeight: FontWeight.w900)),
+            Text('⭐ ' + progress.points.toString() + '  •  🎁 ' +
+                cost.toString(),
+              style: const TextStyle(color: Color(0xFF396A86),
+                fontSize: 12, fontWeight: FontWeight.w800)),
+          ]),
+        )),
+        FilledButton.icon(
+          onPressed: progress.points >= cost && widget.store.helpInventory.chests < 999
+            ? () async {
+                final purchased = await widget.store.buyChestWithPoints();
+                if (!mounted) return;
+                setState(() {
+                  _purchaseMessage = purchased
+                    ? switch (language) {
+                        'en' => 'Chest purchased! Contains 2 guaranteed hints.',
+                        'de' => 'Kiste gekauft! Enthält 2 garantierte Hilfen.',
+                        _ => 'Láda megvéve! 2 garantált segítség jár benne.',
+                      }
+                    : switch (language) {
+                        'en' => 'Not enough academy points.',
+                        'de' => 'Nicht genug Lernpunkte.',
+                        _ => 'Nincs elég akadémiapont.',
+                      };
+                });
+              } : null,
+          icon: const Icon(Icons.card_giftcard_rounded, size: 17),
+          label: Text(buy, style: const TextStyle(fontSize: 11)),
+        ),
+      ]),
     );
   }
 

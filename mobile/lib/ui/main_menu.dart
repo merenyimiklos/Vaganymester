@@ -6,7 +6,8 @@ import '../l10n/game_l10n.dart';
 const _panel = Color(0xFF152E41);
 
 class MainMenu extends StatefulWidget {
-  const MainMenu({super.key, required this.store, required this.onStart});
+  const MainMenu({super.key, required this.store, required this.onStart,
+    required this.onTutorial});
   final SessionStore store;
   final VoidCallback onStart;
   @override

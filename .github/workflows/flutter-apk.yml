@@ -46,6 +46,10 @@ jobs:
           "$RUNNER_TEMP/launcher-icon-venv/bin/python" -m pip install --quiet pillow==11.3.0 cairosvg==2.8.2
           "$RUNNER_TEMP/launcher-icon-venv/bin/python" tool/generate_launcher_icons.py
 
+      - name: Generate original soundtrack and train effects
+        working-directory: mobile
+        run: python3 tool/generate_audio.py
+
       - name: Install dependencies
         working-directory: mobile
         run: flutter pub get
@@ -60,7 +64,7 @@ jobs:
 
       - name: Build release APK
         working-directory: mobile
-        run: flutter build apk --release --build-name 0.6.0 --build-number ${{ github.run_number }}
+        run: flutter build apk --release --build-name 0.7.0 --build-number ${{ github.run_number }}
 
       - name: Upload installable APK
         uses: actions/upload-artifact@v4

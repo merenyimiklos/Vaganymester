@@ -230,6 +230,7 @@ class RailwaySimulation extends ChangeNotifier {
   bool levelComplete = false;
   int earnedStars = 0;
   bool riskMode = false;
+  bool incidentsEnabled = true;
   String message = 'Állíts váltót és jelzőt, majd engedélyezd az indulást!';
 
   String get clock {
@@ -517,7 +518,7 @@ class RailwaySimulation extends ChangeNotifier {
     // An introductory hazard appears in the second stage of each country,
     // and later on busy festival/finale scenarios. It blocks real track
     // movement until the user responds, without depicting an injury.
-    if (hazardEligible && !hazardTriggered && elapsedSeconds >= 35) {
+    if (incidentsEnabled && hazardEligible && !hazardTriggered && elapsedSeconds >= 35) {
       hazardTriggered = true;
       activeHazard = RailwayHazard('FV-KP', 'pedestrian');
       message = 'Gyalogos a síneken!';

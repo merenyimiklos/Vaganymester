@@ -101,6 +101,13 @@ class SessionStore extends ChangeNotifier {
     }
   }
 
+  /// Grant one one-time demo chest for the hands-on help lesson.
+  Future<bool> grantAcademyDemoChest() async {
+    final added = helpInventory.earnChest('academy-help-demo');
+    if (added) await _saveHelps();
+    return added;
+  }
+
   Future<void> _saveHelps() async {
     await _prefs.setString(_helpKey, jsonEncode(helpInventory.toJson()));
     notifyListeners();
