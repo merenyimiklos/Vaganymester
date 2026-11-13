@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
@@ -26,6 +27,7 @@ class PlayfulWorld extends PositionComponent {
     }
     _tracks(canvas);
     _signals(canvas);
+    _incidentScene(canvas);
     _atmosphere(canvas);
   }
 
@@ -156,6 +158,47 @@ class PlayfulWorld extends PositionComponent {
         }
       }
     }
+  }
+
+  /// Friendly non-graphic pedestrian intrusion visual. The simulation
+  /// halts trains on the affected section until the hazard is resolved.
+  void _incidentScene(Canvas c) {
+    final incident = simulation.activeHazard;
+    if (incident == null) return;
+    final x = (simulation.station('fenyvesliget').mapX +
+        simulation.station('korospatak').mapX) / 2;
+    final animation = (25 - incident.secondsToRespond) * 2.4;
+    final y = 311.0 + math.sin(animation) * 9;
+    final glow = Paint()..color = const Color(0x77FF686A);
+    c.drawCircle(Offset(x, y), 38, glow);
+    c.drawCircle(Offset(x, y), 28,
+      Paint()..color = const Color(0xC9FFEF9A));
+    c.drawCircle(Offset(x, y - 12), 8,
+      Paint()..color = const Color(0xFFFFC59A));
+    c.drawRRect(RRect.fromRectAndRadius(
+      Rect.fromLTWH(x - 8, y - 3, 16, 24),
+        const Radius.circular(6)),
+      Paint()..color = const Color(0xFFEB7054));
+    c.drawLine(Offset(x - 7, y + 2), Offset(x - 19, y + 12),
+      Paint()..color = const Color(0xFF254F79)
+        ..strokeWidth = 5..strokeCap = StrokeCap.round);
+    c.drawLine(Offset(x + 7, y + 2), Offset(x + 17, y - 5),
+      Paint()..color = const Color(0xFF254F79)
+        ..strokeWidth = 5..strokeCap = StrokeCap.round);
+    c.drawLine(Offset(x - 4, y + 18), Offset(x - 11, y + 30),
+      Paint()..color = const Color(0xFF314D72)
+        ..strokeWidth = 6..strokeCap = StrokeCap.round);
+    c.drawLine(Offset(x + 4, y + 18), Offset(x + 12, y + 28),
+      Paint()..color = const Color(0xFF314D72)
+        ..strokeWidth = 6..strokeCap = StrokeCap.round);
+    final warning = TextPainter(
+      text: const TextSpan(text: '⚠',
+          style: TextStyle(fontSize: 32,
+            color: Color(0xFFFF3144),
+            fontWeight: FontWeight.w900)),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    warning.paint(c, Offset(x + 27, y - 58));
   }
 
   void _atmosphere(Canvas c) {

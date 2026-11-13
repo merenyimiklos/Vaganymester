@@ -88,6 +88,12 @@ void main() {
     var hint = advisor.suggest(
       sim, HelpType.nextStep, preferredTrain: 'S 2412');
     expect(hint?.focus, HintFocus.turnout);
+    expect(hint?.stationId, 'fenyvesliget');
+    expect(hint?.track, 1);
+    expect(sim.setTurnout('fenyvesliget', RailwaySide.east, 1), isTrue);
+    hint = advisor.suggest(sim, HelpType.nextStep,
+      preferredTrain: 'S 2412');
+    expect(hint?.focus, HintFocus.turnout);
     expect(hint?.stationId, 'korospatak');
     final platform = hint!.track!;
     expect(sim.setTurnout('korospatak', RailwaySide.west, platform), isTrue);

@@ -7,9 +7,9 @@ class GameL10n {
   static String language = 'hu';
 
   static String tr(String hu, [Map<String, Object> args = const {}]) {
-    var result = hu == 'Légy te a\\nforgalom mestere!'
-        ? (language == 'en' ? 'Become the\\nrailway master!'
-            : language == 'de' ? 'Werde Meister\\nder Zugleitung!'
+    var result = hu == 'Légy te a\nforgalom mestere!'
+        ? (language == 'en' ? 'Become the\nrailway master!'
+            : language == 'de' ? 'Werde Meister\nder Zugleitung!'
                 : hu)
         : _table[hu]?[language == 'de' ? 1 : 0] ?? hu;
     if (language == 'hu') result = hu;
@@ -156,5 +156,26 @@ Szintismertető|Level briefing|Level-Einführung
 Fenyvesliget|Pine Grove|Fichtenhain
 Kőröspatak|Creek Junction|Bachkreuz
 Tiszaváros|Tisza Town|Theißstadt
+Ládáid: |Chests: |Kisten: 
+Minden ládában 2 garantált segítség.|Each chest contains two guaranteed hints.|Jede Kiste enthält zwei garantierte Hilfen.
+Megmutatja, mit nyomj meg következőnek.|Shows the next control to tap.|Zeigt die nächste Taste an.
+Megkeresi a következő szabad érkezési peront.|Finds a free arrival platform.|Findet ein freies Einfahrtsgleis.
+Elmagyarázza az induláshoz szükséges vágányutat.|Explains the route required for departure.|Erklärt die nötige Fahrstraße.
+Minden újonnan teljesített pálya egy új ládát ad. A segítség csak akkor fogy el, ha van hasznos javaslat. A későbbi addonok még nincsenek bekapcsolva.|The first clear of each level earns a chest. Hints are only consumed when advice is available. Add-ons are not enabled yet.|Für jeden erstmals abgeschlossenen Level gibt es eine Kiste. Hilfen werden nur bei gültigem Hinweis verbraucht. Add-ons sind noch nicht aktiviert.
+Ládáid|Your chests|Deine Kisten
+Kaptál|You received|Du hast erhalten
+Segítségek|Hints|Hilfen
+Váltó foglalt vagy lezárt vágányra mutat.|Switch points at an occupied or closed track.|Weiche zeigt auf ein besetztes oder gesperrtes Gleis.
+Vágányzár alatt nem indulhat új vonat.|No departures during track closure.|Bei Gleissperrung keine Abfahrten.
+Játékosnév|Player name|Spielername
+Állomások|Stations|Bahnhöfe
+ÚJ SZINT|NEW LEVEL|NEUES LEVEL
+A vonat nem indítható.|The train cannot depart.|Der Zug kann nicht abfahren.
+Új veszélyhelyzet|New hazard|Neue Gefahr
+Automata módban a forgalomirányító kezeli az indulásokat.|In auto mode, dispatch is automatic.|Im Automatikmodus erfolgt die Zugleitung automatisch.
+Nincs indulásra váró vonat.|No train is ready to depart.|Kein Zug ist abfahrbereit.
+A vonat nem indítható.|The train cannot be dispatched.|Der Zug kann nicht abfahren.
+Kézi üzem|Manual mode|Manueller Betrieb
+Kérlek állítsd a váltót!|Please set the switch!|Bitte stelle die Weiche!
 ''';
 }
