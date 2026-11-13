@@ -93,3 +93,56 @@ Az ütközések **szándékosan előidézhetők** az oktatási modellben. Péld�
 - A fülek, gombok, listák, táblázatfejlécek és kombinált listák olvashatósága javult.
 
 GitHub Actions munkafolyamat végzi a WPF-projekt Windowsos fordításellenőrzését a PR-eken.
+
+
+## Újdonságok: Hálózati központ és automatikus forgalomirányítás
+
+A program indulásakor a **Hálózati térkép** nyílik meg. Az eredeti állomási pult továbbra is
+a **Kőröspatak** csomópont részletes kezelőfelülete. A két nézet ugyanazt a
+DispatchEngine példányt használja, tehát a vonatok és a jelzőállapotok közösek.
+
+Az első hálózati verzió **5 névvel ellátott állomást** jelenít meg:
+Nyugati pályaudvar, Fenyvesliget, Kőröspatak, Tiszaváros, Keleti pályaudvar.
+Kőröspatak a ténylegesen szimulált, kétvágányos állomás; a további négy
+állomás egyelőre **sematikus hálózati csomópont**. A nyugati és keleti
+vonalhoz kapcsolódó engedélyek a központi szimulációra valóban hatnak.
+Ez még nem teljes, több különálló biztosítóberendezéssel rendelkező hálózat.
+
+### Tíz új funkció
+
+1. **Ötállomásos hálózati térkép** – kattintható pályaudvarok, csatlakozó vonalak.
+2. **Élő vonatkövetés** – közeledő és a központi állomáson közlekedő szerelvények mozgó jelölői, vonatszám és státusz.
+3. **Kézi belépési engedély** – a nyugati/keleti vonalról érkező forgalom külön tiltása vagy engedése.
+4. **Kézi kihaladási engedély** – külön engedély az állomást nyugat vagy kelet felé elhagyó vonatoknak.
+5. **Automata forgalmi szolgálattevő** – a jelzők és váltók automatikus állítása a szabad vágányok és vonatok alapján.
+6. **InterCity-prioritás** – választható IC-elsőbbség a belépésre váró vonatok között.
+7. **Vágányzár / pályamunka** – az 1. vagy 2. állomási vágány kizárása az új biztonságos vágányutakból.
+8. **Késésfigyelés** – 15 másodpercnél nagyobb belépési késések számlálója, várakozási okok.
+9. **Központi vészleállítás és feloldás** – minden aktív vonat megállítása és minden jelző vörösre állítása.
+10. **Forgalmi napló CSV-exportja** – pontos szimulációs idővel, Excelben megnyitható magyar CSV-ként.
+
+### Megjelenés
+
+- Az állomási térképen modern, ablakos, színes szerelvényprofilok.
+- Az utastérben lekerekített székek, ülésoldali díszcsík, szabad/foglalt színek,
+  középső folyosó, kihasználtsági sáv és hosszanti vonatprofil.
+- A hálózati központ sötétkék diszpécseri stílusa a korábban javított sötét témára épül.
+
+### Játék / kezelés
+
+- **Hálózati térkép**: az állomási pult fejlécében lévő gomb, illetve induláskor automatikusan nyílik.
+- **Állomási kezelőpult**: visszavált a részletes jelző- és váltóállításhoz.
+- **Állomás kiválasztása**: kattintás az öt csomópont egyikére.
+- **Belépés / kihaladás**: a nyugati vagy keleti csatlakozó vonal lezárható; tiltott belépő menetrendi vonat várólistán marad.
+- **Automata**: az "Automata jelző- és váltókezelés" kapcsoló a hálózati és az állomási nézetből is elérhető.
+- **Vágányzár**: a beállítás az új vágányút-engedélyezést korlátozza. A már a vágányon haladó vonatot nem mozgatja át.
+- **Vészleállítás**: automatikus mód kikapcsol, minden jelző vörös; a forgalom feloldása után a jelzők újra állítandók.
+- **Napló exportálása**: mentés helyét és fájlnevét a felhasználó választja ki.
+
+### További fejlesztési irány
+
+A következő iterációban a négy csatlakozó állomás saját peronkapacitást,
+helyi jelzőket és váltókat, vonatfordulókat, menetrendi késéseket és szakaszfoglaltságot
+kaphat. Ehhez célszerű a mai egyállomásos szimulációs motort szakaszokra bontani,
+és a vonatokat átadni az állomások között: csak ekkor lesz a hálózati nézet
+teljes értékű, önállóan működő többállomásos biztosítóberendezési szimuláció.

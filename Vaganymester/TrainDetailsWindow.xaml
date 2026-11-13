@@ -7,17 +7,50 @@
         Background="{StaticResource Bg}" Foreground="{StaticResource Ink}">
     <Window.Resources>
         <Style x:Key="SeatButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="Width" Value="91"/>
-            <Setter Property="Height" Value="58"/>
+            <Setter Property="Width" Value="94"/>
+            <Setter Property="Height" Value="64"/>
             <Setter Property="Margin" Value="4"/>
-            <Setter Property="Padding" Value="4"/>
-            <Setter Property="Background" Value="#17634D"/>
-            <Setter Property="BorderBrush" Value="#52DEAC"/>
+            <Setter Property="Padding" Value="6"/>
+            <Setter Property="Background" Value="#155047"/>
+            <Setter Property="Foreground" Value="#EDFDFC"/>
+            <Setter Property="BorderBrush" Value="#49DDB9"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
             <Setter Property="ToolTip" Value="{Binding Description}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Border x:Name="SeatShell" Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="11" Margin="0,0,0,2">
+                                <Grid>
+                                    <Border Width="5" HorizontalAlignment="Left" Background="#61DEC3"
+                                            CornerRadius="8,0,0,8" Margin="2,4,0,4"/>
+                                    <ContentPresenter ContentSource="Content"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center" Margin="7,2,2,2"/>
+                                </Grid>
+                            </Border>
+                            <Border Height="5" VerticalAlignment="Bottom" Margin="12,0,12,0"
+                                    Background="#385969" CornerRadius="0,0,5,5"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="SeatShell" Property="BorderBrush" Value="#F7F9FD"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="SeatShell" Property="Opacity" Value="0.73"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsOccupied}" Value="True">
-                    <Setter Property="Background" Value="#76512C"/>
-                    <Setter Property="BorderBrush" Value="#E8A759"/>
+                    <Setter Property="Background" Value="#634932"/>
+                    <Setter Property="BorderBrush" Value="#FFBF71"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -44,6 +77,27 @@
                     <TextBlock Text="Mozdonyvezető: " Foreground="#9CB7C8"/>
                     <TextBlock Text="{Binding DriverName}"/>
                 </StackPanel>
+                <Border Margin="0,12,0,0" Height="41" Width="480" HorizontalAlignment="Left"
+                        Background="#1A394B" CornerRadius="12" BorderBrush="#447187" BorderThickness="1">
+                    <Grid Margin="8,5">
+                        <Border CornerRadius="13,5,5,13" Background="{Binding BodyBrush}" Margin="0,0,0,2"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="20,6,0,0">
+                            <Border Background="#14344A" CornerRadius="3" Width="48" Height="10" Margin="0,0,9,0"/>
+                            <Border Background="#14344A" CornerRadius="3" Width="48" Height="10" Margin="0,0,9,0"/>
+                            <Border Background="#14344A" CornerRadius="3" Width="48" Height="10" Margin="0,0,9,0"/>
+                            <Border Background="#14344A" CornerRadius="3" Width="48" Height="10"/>
+                        </StackPanel>
+                        <Border Height="10" VerticalAlignment="Bottom" Background="#123448"
+                                CornerRadius="4" Margin="18,0,8,1">
+                            <TextBlock Text="{Binding ConsistLabel}" FontSize="9" Foreground="#F7FCFF"
+                                       HorizontalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+                </Border>
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <TextBlock Text="MODERN RAIL • " Foreground="#66E6C7" FontSize="10" FontWeight="Bold"/>
+                    <TextBlock Text="{Binding ConsistLabel}" Foreground="#B5CBD9" FontSize="10"/>
+                </StackPanel>
             </StackPanel>
             <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
                 <TextBlock Text="{Binding Status}" HorizontalAlignment="Right" FontWeight="Bold" Foreground="#61D7B4"/>
@@ -63,7 +117,12 @@
                 <StackPanel><TextBlock Text="SZABAD HELYEK" FontSize="11" Foreground="#A2BECD"/><TextBlock Text="{Binding FreeSeats}" FontSize="29" FontWeight="Bold" Foreground="#58DEB2"/></StackPanel>
             </Border>
             <Border Background="#152B38" BorderBrush="#365366" BorderThickness="1" CornerRadius="8" Padding="15">
-                <StackPanel><TextBlock Text="KIHASZNÁLTSÁG" FontSize="11" Foreground="#A2BECD"/><TextBlock Text="{Binding OccupancyText}" FontSize="29" FontWeight="Bold"/></StackPanel>
+                <StackPanel>
+                    <TextBlock Text="KIHASZNÁLTSÁG" FontSize="11" Foreground="#A2BECD"/>
+                    <TextBlock Text="{Binding OccupancyText}" FontSize="29" FontWeight="Bold"/>
+                    <ProgressBar Value="{Binding OccupancyPercent}" Minimum="0" Maximum="100"
+                                 Height="8" Margin="0,5,0,0" Foreground="#38E3B9" Background="#355063"/>
+                </StackPanel>
             </Border>
         </UniformGrid>
 
@@ -92,7 +151,7 @@
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Top" HorizontalAlignment="Center" Margin="0,3,0,12">
                             <TextBlock Text="{Binding SelectedItem.Name, ElementName=CarriageList}" HorizontalAlignment="Center" FontSize="19" FontWeight="Bold"/>
-                            <TextBlock Text="A / B     FOLYOSÓ     C / D" HorizontalAlignment="Center" FontSize="10" Foreground="#A5C0CC" Margin="0,6,0,0"/>
+                            <TextBlock Text="ABLAK  A / B     KÖZÉPFOLYOSÓ     C / D  ABLAK" HorizontalAlignment="Center" FontSize="10" Foreground="#A5C0CC" Margin="0,6,0,0"/>
                         </StackPanel>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
                             <ItemsControl ItemsSource="{Binding SelectedItem.Rows, ElementName=CarriageList}">
@@ -105,8 +164,8 @@
                                             <Button Style="{StaticResource SeatButton}" DataContext="{Binding B}" Click="Seat_Click">
                                                 <StackPanel><TextBlock Text="{Binding Label}" FontWeight="Bold" HorizontalAlignment="Center"/><TextBlock Text="{Binding ShortName}" FontSize="10" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="80"/></StackPanel>
                                             </Button>
-                                            <Border Width="32" Background="#273C49" CornerRadius="4" Margin="5,8" VerticalAlignment="Stretch">
-                                                <TextBlock Text="⇅" Foreground="#8BACBE" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            <Border Width="31" Background="#25445A" CornerRadius="11" Margin="5,8" VerticalAlignment="Stretch">
+                                                <TextBlock Text="⇅" Foreground="#A8CBDC" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
                                             <Button Style="{StaticResource SeatButton}" DataContext="{Binding C}" Click="Seat_Click">
                                                 <StackPanel><TextBlock Text="{Binding Label}" FontWeight="Bold" HorizontalAlignment="Center"/><TextBlock Text="{Binding ShortName}" FontSize="10" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="80"/></StackPanel>
@@ -154,9 +213,9 @@
             </StackPanel>
         </Border>
         <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,14,0,0">
-            <Border Background="#17634D" Width="16" Height="16" CornerRadius="3" Margin="0,0,8,0"/>
+            <Border Background="#155047" Width="16" Height="16" CornerRadius="3" Margin="0,0,8,0"/>
             <TextBlock Text="Szabad" Margin="0,0,20,0"/>
-            <Border Background="#76512C" Width="16" Height="16" CornerRadius="3" Margin="0,0,8,0"/>
+            <Border Background="#634932" Width="16" Height="16" CornerRadius="3" Margin="0,0,8,0"/>
             <TextBlock Text="Foglalt" Margin="0,0,20,0"/>
             <TextBlock Text="A nevek és a helyfoglaltság generált, oktatási szimulációs adatok." Foreground="#93AFBD"/>
         </StackPanel>
