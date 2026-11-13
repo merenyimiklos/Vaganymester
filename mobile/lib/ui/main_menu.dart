@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../data/session_store.dart';
 import 'menu_art.dart';
+import '../l10n/game_l10n.dart';
 
 const _panel = Color(0xFF152E41);
 
@@ -62,16 +63,16 @@ class _MainMenuState extends State<MainMenu> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _tag('🚆  ÚJ VASÚTI KALAND'),
+                    _tag(GameL10n.tr('🚆  ÚJ VASÚTI KALAND')),
                     const SizedBox(height: 9),
-                    const Text('Légy te a\nforgalom mestere!',
+                    Text(GameL10n.tr('Légy te a\nforgalom mestere!'),
                       style: TextStyle(color: Color(0xFF173E65),
                         fontSize: 27, height: 1.07,
                         fontWeight: FontWeight.w900,
                         shadows: [Shadow(color: Colors.white,
                             blurRadius: 12)])),
                     const SizedBox(height: 9),
-                    _tag('⭐ Pontgyűjtés   ❤️ 3 élet   🏆 Ranglista'),
+                    _tag(GameL10n.tr('⭐ Pontgyűjtés   ❤️ 3 élet   🏆 Ranglista')),
                   ],
                 ),
               ),
@@ -95,15 +96,16 @@ class _MainMenuState extends State<MainMenu> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(loggedIn ? 'Üdv a központban!' : 'VENDÉG BELÉPÉS',
+                        Text(GameL10n.tr(loggedIn ? 'Üdv a központban!' : 'VENDÉG BELÉPÉS'),
                           style: const TextStyle(
                             color: Color(0xFF154A76), fontSize: 19,
                             fontWeight: FontWeight.w900)),
                         const SizedBox(height: 4),
-                        Text(loggedIn ? widget.store.playerName! :
-                          'Adj meg egy nevet, és kezdődhet a szolgálat!',
+                        Padding(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                          child: Text(loggedIn ? widget.store.playerName! :
+                          GameL10n.tr('Adj meg egy nevet, és kezdődhet a szolgálat!'),
                           style: const TextStyle(
-                            color: Color(0xFF477B96), fontSize: 12)),
+                            color: Color(0xFF477B96), fontSize: 12))),
                         const SizedBox(height: 12),
                         if (!loggedIn) ...[
                           TextField(
@@ -112,8 +114,8 @@ class _MainMenuState extends State<MainMenu> {
                             textInputAction: TextInputAction.done,
                             onSubmitted: _login,
                             style: const TextStyle(color: Color(0xFF154A76)),
-                            decoration: const InputDecoration(
-                              labelText: 'Játékos neve',
+                            decoration: InputDecoration(
+                              labelText: GameL10n.tr('Játékos neve'),
                               labelStyle: TextStyle(color: Color(0xFF52788F)),
                               border: OutlineInputBorder(),
                               counterText: '',
@@ -121,22 +123,22 @@ class _MainMenuState extends State<MainMenu> {
                                   color: Color(0xFF177FB5)),
                             ),
                           ),
-                          _mainButton('BELÉPÉS', Icons.login_rounded,
+                          _mainButton(GameL10n.tr('BELÉPÉS'), Icons.login_rounded,
                               () => _login(_name.text)),
                         ] else ...[
-                          _mainButton('JÁTÉK INDÍTÁSA',
+                          _mainButton(GameL10n.tr('JÁTÉK INDÍTÁSA'),
                               Icons.play_arrow_rounded, widget.onStart),
                           const SizedBox(height: 8),
-                          _secondaryButton('RANGLISTA',
+                          _secondaryButton(GameL10n.tr('RANGLISTA'),
                               Icons.emoji_events_rounded,
                               () => showLeaderboard(context, widget.store)),
                           const SizedBox(height: 7),
-                          _secondaryButton('BEÁLLÍTÁSOK',
+                          _secondaryButton(GameL10n.tr('BEÁLLÍTÁSOK'),
                               Icons.settings_rounded,
                               () => showSettings(context, widget.store)),
                           TextButton(
                             onPressed: widget.store.signOut,
-                            child: const Text('Vendégváltás',
+                            child: Text(GameL10n.tr('Vendégváltás'),
                               style: TextStyle(color: Color(0xFF356987))),
                           ),
                         ],
@@ -217,7 +219,7 @@ class _MainMenuState extends State<MainMenu> {
       widget.store.enter(text);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Adj meg egy játékosnevet!')),
+        SnackBar(content: Text(GameL10n.tr('Adj meg egy játékosnevet!'))),
       );
     }
   }
@@ -227,7 +229,7 @@ Future<void> showSettings(BuildContext context, SessionStore store) async {
   await showDialog<void>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('BEÁLLÍTÁSOK'),
+      title: Text(GameL10n.tr('BEÁLLÍTÁSOK')),
       content: SizedBox(
         width: 420,
         child: AnimatedBuilder(
@@ -236,25 +238,25 @@ Future<void> showSettings(BuildContext context, SessionStore store) async {
             shrinkWrap: true,
             children: [
               SwitchListTile(
-                title: const Text('Automatikus irányítás'),
-                subtitle: const Text('Automatikus jelző- és váltókezelés'),
+                title: Text(GameL10n.tr('Automatikus irányítás')),
+                subtitle: Text(GameL10n.tr('Automatikus jelző- és váltókezelés')),
                 value: store.autoDispatch,
                 onChanged: store.setAuto,
               ),
               SwitchListTile(
-                title: const Text('Kockázatos játékmód'),
-                subtitle: const Text(
-                  'Veszélyes indításkor ütközés és életvesztés is lehet'),
+                title: Text(GameL10n.tr('Kockázatos játékmód')),
+                subtitle: Text(GameL10n.tr(
+                  'Veszélyes indításkor ütközés és életvesztés is lehet')),
                 value: store.riskMode,
                 onChanged: store.setRisk,
               ),
               SwitchListTile(
-                title: const Text('Kezelési tippek'),
+                title: Text(GameL10n.tr('Kezelési tippek')),
                 value: store.showHints,
                 onChanged: store.setHints,
               ),
               const Divider(),
-              const Text('Alapértelmezett sebesség'),
+              Text(GameL10n.tr('Alapértelmezett sebesség')),
               DropdownButton<int>(
                 value: store.speed,
                 items: const [1, 10, 30, 60]
@@ -265,18 +267,31 @@ Future<void> showSettings(BuildContext context, SessionStore store) async {
                   if (value != null) store.setSpeed(value);
                 },
               ),
-              const Text(
-                'Az eredmények kizárólag ezen az eszközön maradnak.',
-                style: TextStyle(fontSize: 12,
-                    color: Color(0xFFB3CEDB)),
+              const SizedBox(height: 9),
+              Text(GameL10n.tr('Nyelv'),
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+              DropdownButton<String>(
+                isExpanded: true,
+                value: store.language,
+                items: const [
+                  DropdownMenuItem(value: 'hu', child: Text('🇭🇺 Magyar')),
+                  DropdownMenuItem(value: 'en', child: Text('🇬🇧 English')),
+                  DropdownMenuItem(value: 'de', child: Text('🇩🇪 Deutsch')),
+                ],
+                onChanged: (value) {
+                  if (value != null) store.setLanguage(value);
+                },
               ),
+              Text(GameL10n.tr('Az eredmények kizárólag ezen az eszközön maradnak.'),
+                style: const TextStyle(fontSize: 12, color: Color(0xFFB3CEDB))),
+
             ],
           ),
         ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context),
-          child: const Text('KÉSZ')),
+          child: Text(GameL10n.tr('KÉSZ'))),
       ],
     ),
   );
@@ -286,11 +301,11 @@ Future<void> showLeaderboard(BuildContext context, SessionStore store) async {
   await showDialog<void>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.emoji_events, color: Color(0xFFFFCC68)),
-          SizedBox(width: 10),
-          Text('HELYI RANGLISTA'),
+          const Icon(Icons.emoji_events, color: Color(0xFFFFCC68)),
+          const SizedBox(width: 10),
+          Text(GameL10n.tr('HELYI RANGLISTA')),
         ],
       ),
       content: SizedBox(
@@ -299,8 +314,8 @@ Future<void> showLeaderboard(BuildContext context, SessionStore store) async {
         child: AnimatedBuilder(
           animation: store,
           builder: (context, _) => store.leaderboard.isEmpty
-              ? const Center(child: Text(
-                  'Még nincs eredmény. Teljesíts egy szolgálatot!'))
+              ? Center(child: Text(GameL10n.tr(
+                  'Még nincs eredmény. Teljesíts egy szolgálatot!')))
               : ListView.builder(
                   itemCount: store.leaderboard.length,
                   itemBuilder: (context, index) {
@@ -318,7 +333,7 @@ Future<void> showLeaderboard(BuildContext context, SessionStore store) async {
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context),
-            child: const Text('BEZÁRÁS')),
+            child: Text(GameL10n.tr('BEZÁRÁS'))),
       ],
     ),
   );

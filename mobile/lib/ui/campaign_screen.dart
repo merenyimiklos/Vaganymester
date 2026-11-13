@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../data/session_store.dart';
 import '../game/level_catalog.dart';
 import 'menu_art.dart';
+import '../l10n/game_l10n.dart';
+import '../l10n/level_l10n.dart';
 
 const _ink = Color(0xFF153C60);
 const _muted = Color(0xFF43738B);
@@ -73,7 +75,7 @@ class _CampaignScreenState extends State<CampaignScreen> {
         IconButton(onPressed: widget.onBack,
           icon: const Icon(Icons.arrow_back_rounded, color: _blue),
           tooltip: 'Vissza a főmenübe'),
-        const Text('ORSZÁGOK ÉS PÁLYÁK',
+        Text(GameL10n.tr('ORSZÁGOK ÉS PÁLYÁK'),
           style: TextStyle(color: _ink, fontSize: 17,
               fontWeight: FontWeight.w900)),
         const Spacer(),
@@ -127,13 +129,13 @@ class _CampaignScreenState extends State<CampaignScreen> {
                 Expanded(child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(country.name, maxLines: 1,
+                    Text(country.localizedName, maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: _ink,
                         fontWeight: FontWeight.w900, fontSize: 12)),
                     const SizedBox(height: 3),
                     Text(unlocked
-                        ? completed.toString() + '/10 pálya'
+                        ? completed.toString() + '/10 ' + GameL10n.tr('pálya')
                         : '🔒 Zárolva',
                       style: const TextStyle(
                           color: _muted, fontSize: 10)),
@@ -165,20 +167,20 @@ class _CampaignScreenState extends State<CampaignScreen> {
             Text(country.name,
               style: const TextStyle(color: _ink,
                   fontSize: 18, fontWeight: FontWeight.w900)),
-            Text(country.subtitle,
+            Text(country.localizedSubtitle,
               maxLines: 1, overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: _muted, fontSize: 11)),
           ],
         )),
         if (locked)
-          const Chip(
-            avatar: Icon(Icons.lock_outline_rounded, size: 17),
-            label: Text('Előző ország szükséges'),
+          Chip(
+            avatar: const Icon(Icons.lock_outline_rounded, size: 17),
+            label: Text(GameL10n.tr('Előző ország szükséges')),
           )
         else
-          const Chip(
-            avatar: Icon(Icons.route_rounded, color: Color(0xFF279E6C)),
-            label: Text('10 egyedi szint'),
+          Chip(
+            avatar: const Icon(Icons.route_rounded, color: Color(0xFF279E6C)),
+            label: Text(GameL10n.tr('10 egyedi szint')),
           ),
       ]),
     );
@@ -242,7 +244,7 @@ class _CampaignScreenState extends State<CampaignScreen> {
                   const Icon(Icons.play_circle_fill_rounded,
                       color: Color(0xFF34B36C), size: 24),
               ]),
-              Text(level.title, maxLines: 2,
+              Text(level.localizedTitle, maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: unlocked ? _ink : const Color(0xFF6B8393),
@@ -281,20 +283,19 @@ class _CampaignScreenState extends State<CampaignScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(level.description,
+              Text(level.localizedDescription,
                   style: const TextStyle(color: _muted)),
               const SizedBox(height: 12),
-              _info('Nehézség', level.difficultyLabel),
-              _info('Különleges kihívás', level.featureLabel),
-              _info('Vonatok', level.trainCount.toString()),
-              _info('Teljesítendő menetek',
+              _info(GameL10n.tr('Nehézség'), level.difficultyLabel),
+              _info(GameL10n.tr('Különleges kihívás'), level.localizedFeature),
+              _info(GameL10n.tr('Vonatok'), level.trainCount.toString()),
+              _info(GameL10n.tr('Teljesítendő menetek'),
                   level.requiredArrivals.toString()),
-              _info('3 csillagos időcél',
+              _info(GameL10n.tr('3 csillagos időcél'),
                   (level.targetSeconds ~/ 60).toString() + ' perc'),
               const SizedBox(height: 8),
-              const Text(
-                'Az első teljesítés feloldja a következő pályát. '
-                'Az újrajátszással több csillag gyűjthető.',
+              Text(GameL10n.tr(
+                'Az első teljesítés feloldja a következő pályát. Az újrajátszással több csillag gyűjthető.'),
                 style: TextStyle(fontSize: 11, color: _muted)),
             ],
           ),
@@ -302,7 +303,7 @@ class _CampaignScreenState extends State<CampaignScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('VISSZA'),
+            child: Text(GameL10n.tr('VISSZA')),
           ),
           FilledButton.icon(
             onPressed: () {
@@ -310,7 +311,7 @@ class _CampaignScreenState extends State<CampaignScreen> {
               widget.onPlay(level);
             },
             icon: const Icon(Icons.play_arrow_rounded),
-            label: const Text('PÁLYA INDÍTÁSA'),
+            label: Text(GameL10n.tr('PÁLYA INDÍTÁSA')),
           ),
         ],
       ),

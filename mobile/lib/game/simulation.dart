@@ -117,6 +117,15 @@ class SimTrain {
 /// A megjelenítéstől független, determinisztikus oktatási játékmodell.
 /// Egy szakaszon egyszerre csak egy vonat közlekedhet.
 /// Az érkezési állomáson már induláskor lefoglalunk egy szabad peronhelyet.
+/// A deliberately fictional, non-graphic safety incident.
+class RailwayHazard {
+  RailwayHazard(this.sectionId, this.kind);
+  final String sectionId;
+  final String kind;
+  double secondsToRespond = 25;
+}
+
+/// Simulation rules stay completely independent from presentation.
 class RailwaySimulation extends ChangeNotifier {
   RailwaySimulation({GameLevel? level}) : level = level ?? LevelCatalog.initial {
     final selected = this.level;
@@ -157,7 +166,7 @@ class RailwaySimulation extends ChangeNotifier {
         SimTrain(number: 'S 2412', kind: TrainKind.regional,
           driver: 'Kovács András',
           route: ['fenyvesliget','korospatak','tiszavaros'],
-          speedKmH: 88, readyAt: 10),
+          speedKmH: 88, readyAt: 0)..platformTrack = 1,
         SimTrain(number: 'IC 502', kind: TrainKind.intercity,
           driver: 'Szabó Anna',
           route: ['tiszavaros','korospatak','fenyvesliget'],
@@ -210,6 +219,14 @@ class RailwaySimulation extends ChangeNotifier {
   int combo = 0;
   int collisionCount = 0;
   bool gameOver = false;
+  RailwayHazard? activeHazard;
+  bool hazardTriggered = false;
+  int hazardResolvedCount = 0;
+  int hazardFailedCount = 0;
+  bool get hasHazard => activeHazard != null;
+  bool get hazardEligible => level.feature == LevelFeature.rushHour ||
+      level.feature == LevelFeature.festival ||
+      level.feature == LevelFeature.finale;
   bool levelComplete = false;
   int earnedStars = 0;
   bool riskMode = false;
@@ -364,6 +381,10 @@ class RailwaySimulation extends ChangeNotifier {
     collisionCount = 0;
     completedLegs = 0;
     gameOver = false;
+    activeHazard = null;
+    hazardTriggered = false;
+    hazardResolvedCount = 0;
+    hazardFailedCount = 0;
     levelComplete = false;
     earnedStars = 0;
     emergency = false;
@@ -416,6 +437,31 @@ class RailwaySimulation extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The player actively secures the section before service resumes.
+  bool secureHazard() {
+    if (activeHazard == null || gameOver) return false;
+    activeHazard = null;
+    hazardResolvedCount++;
+    score += 80;
+    message = 'Sikeres beavatkozás: +80 pont';
+    notifyListeners();
+    return true;
+  }
+
+  void _unresolvedHazard() {
+    activeHazard = null;
+    hazardFailedCount++;
+    combo = 0;
+    lives = math.max(0, lives - 1);
+    score = math.max(0, score - 180);
+    if (lives == 0) {
+      gameOver = true;
+      running = false;
+    }
+    message = 'Figyelmen kívül hagyott veszély: -1 élet';
+    notifyListeners();
+  }
+
   void setEmergency(bool value) {
     emergency = value;
     if (value) {
@@ -429,7 +475,8 @@ class RailwaySimulation extends ChangeNotifier {
 
   bool setSectionClosed(String sectionId, bool value) {
     final section = sections.firstWhere((s) => s.id == sectionId);
-    if (value && occupying(section) != null) return false;
+    if (value && (occupying(section) != null ||
+        activeHazard?.sectionId == section.id)) return false;
     section.closed = value;
     notifyListeners();
     return true;
@@ -447,7 +494,15 @@ class RailwaySimulation extends ChangeNotifier {
   /// másodperces lépésekben halad, így nem ugrik át foglaltsági eseményeket.
   void tick(double realSeconds) {
     if (!running || emergency || gameOver || levelComplete) return;
-    var remaining = realSeconds.clamp(0.0, 0.2).toDouble() * timeMultiplier;
+    final dt = realSeconds.clamp(0.0, 0.2).toDouble();
+    if (activeHazard != null) {
+      activeHazard!.secondsToRespond -= dt;
+      if (activeHazard!.secondsToRespond <= 0) {
+        _unresolvedHazard();
+        if (gameOver) return;
+      }
+    }
+    var remaining = dt * timeMultiplier;
     while (remaining > 0) {
       final step = math.min(0.5, remaining);
       _advance(step);
@@ -459,10 +514,20 @@ class RailwaySimulation extends ChangeNotifier {
   void _advance(double dt) {
     elapsedSeconds += dt;
 
+    // An introductory hazard appears in the second stage of each country,
+    // and later on busy festival/finale scenarios. It blocks real track
+    // movement until the user responds, without depicting an injury.
+    if (hazardEligible && !hazardTriggered && elapsedSeconds >= 35) {
+      hazardTriggered = true;
+      activeHazard = RailwayHazard('FV-KP', 'pedestrian');
+      message = 'Gyalogos a síneken!';
+    }
+
     // Előbb a mozgó vonatokat dolgozzuk fel, utána az új indulásokat.
     for (final train in trains.where((t) => t.moving)) {
       final section = sectionBetween(
         train.currentStationId, train.nextStationId);
+      if (activeHazard?.sectionId == section.id) continue;
       train.progress += dt * train.speedKmH * level.speedFactor /
           (3600 * section.lengthKm);
       if (train.progress >= 1) {
@@ -487,7 +552,8 @@ class RailwaySimulation extends ChangeNotifier {
       }
     }
 
-    if (!levelComplete && completedLegs >= level.requiredArrivals) {
+    if (!levelComplete && activeHazard == null &&
+        completedLegs >= level.requiredArrivals) {
       levelComplete = true;
       running = false;
       earnedStars = lives == 3 && collisionCount == 0 &&
@@ -513,7 +579,8 @@ class RailwaySimulation extends ChangeNotifier {
       if (!automatic && !train.authorized) continue;
       final section = sectionBetween(
         train.currentStationId, train.nextStationId);
-      if (section.closed || occupying(section) != null) continue;
+      if (section.closed || activeHazard?.sectionId == section.id ||
+          occupying(section) != null) continue;
       final side = travelSide(train);
       final source = controls(train.currentStationId);
       final destination = controls(train.nextStationId);

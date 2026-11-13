@@ -1,5 +1,8 @@
 # VÁGÁNYMESTER Mobile
 
+**0.6.0:** Interaktív első tanulópálya, sárga kezelőszerv-kiemelések, új pályák szabályismertetői, gyalogos pályaveszély, magyar/angol/német nyelv. [Részletes leírás](TUTORIAL_AND_LOCALES.md).
+
+
 **0.5.0:** Összecsukható feladatok, kézi segítségfogyóeszközök, ingyenesen szerezhető ládák, mindig látható 1×/10×/30×/60× sebesség, célzott játékbeli vizuális segítség, új saját alkalmazásikon. A részletes leírás: [HELP_SYSTEM.md](HELP_SYSTEM.md).
 
 **0.4.0:** 6 ország, 60 pálya, csillagos nehézség és jutalom, szintzárak, országfüggő vonatok és táj, helyi kampánymentés. [Kampányrendszer dokumentáció](CAMPAIGN.md).

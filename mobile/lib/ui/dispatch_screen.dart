@@ -8,6 +8,11 @@ import '../game/simulation.dart';
 import '../game/level_catalog.dart';
 import '../game/help_inventory.dart';
 import '../game/help_advisor.dart';
+import '../game/tutorial_guide.dart';
+import '../game/level_briefing.dart';
+import '../l10n/game_l10n.dart';
+import '../l10n/level_l10n.dart';
+import 'tutorial_coach.dart';
 import '../data/session_store.dart';
 import 'main_menu.dart';
 import 'station_controls_panel.dart';
@@ -44,15 +49,27 @@ class _DispatchScreenState extends State<DispatchScreen> {
   HelpSuggestion? _activeHint;
   String? _notice;
   Timer? _noticeTimer;
+  TutorialGuide? _tutorial;
+  bool _tutorialFinishedNotice = false;
+  bool _hazardSeen = false;
+  bool _hazardShowing = false;
 
   @override
   void initState() {
     super.initState();
+    if (widget.level.id == 'hu-1') _tutorial = TutorialGuide();
     simulation = RailwaySimulation(level: widget.level)
-      ..setAutomatic(widget.store.autoDispatch)
+      ..setAutomatic(_tutorial == null ? widget.store.autoDispatch : false)
       ..setRiskMode(widget.store.riskMode)
       ..setMultiplier(widget.store.speed);
-    simulation.addListener(_checkGameOver);
+    if (_tutorial != null) simulation.setRunning(false);
+    simulation.addListener(_onSimulationUpdate);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _tutorial == null &&
+          !widget.store.introducedLevels.contains(widget.level.id)) {
+        _showFeatureBriefing();
+      }
+    });
     game = RailwayGame(
       simulation: simulation,
       onStation: _selectStation,
@@ -63,9 +80,78 @@ class _DispatchScreenState extends State<DispatchScreen> {
   @override
   void dispose() {
     _noticeTimer?.cancel();
-    simulation.removeListener(_checkGameOver);
+    simulation.removeListener(_onSimulationUpdate);
     simulation.dispose();
+    _tutorial?.dispose();
     super.dispose();
+  }
+
+  void _onSimulationUpdate() {
+    if (_tutorial?.step == TutorialStep.waitForArrival &&
+        simulation.train('S 2412').completedLegs >= 1) {
+      _advanceTutorial(TutorialAction.firstArrival);
+    }
+    if (simulation.hasHazard && !_hazardSeen) {
+      _hazardSeen = true;
+      _warn(GameL10n.tr('Gyalogos a síneken!'));
+    }
+    if (_hazardShowing != simulation.hasHazard) {
+      _hazardShowing = simulation.hasHazard;
+      if (mounted) setState(() {});
+    }
+    _checkGameOver();
+  }
+
+  void _advanceTutorial(TutorialAction action) {
+    final guide = _tutorial;
+    if (guide == null || !guide.accept(action)) return;
+    if (guide.step == TutorialStep.completed &&
+        !_tutorialFinishedNotice) {
+      _tutorialFinishedNotice = true;
+      widget.store.markIntroduced(widget.level);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _warn(GameL10n.tr('Oktatás befejezve!'));
+      });
+    }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _showFeatureBriefing() async {
+    if (!mounted) return;
+    simulation.setRunning(false);
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFFF5FCFF),
+        title: Row(children: [
+          const Icon(Icons.auto_awesome_rounded,
+              color: Color(0xFFE9AB27), size: 29),
+          const SizedBox(width: 9),
+          Expanded(child: Text(
+            LevelBriefing.title(widget.level, widget.store.language),
+            style: const TextStyle(color: Color(0xFF174A70),
+                fontSize: 19, fontWeight: FontWeight.w900))),
+        ]),
+        content: SizedBox(
+          width: 440,
+          child: Text(LevelBriefing.explanation(
+              widget.level, widget.store.language),
+            style: const TextStyle(color: Color(0xFF2A5873),
+                fontSize: 15, height: 1.4)),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(GameL10n.tr('ÉRTEM')),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    await widget.store.markIntroduced(widget.level);
+    if (mounted && !simulation.gameOver) simulation.setRunning(true);
   }
 
   void _checkGameOver() {
@@ -99,7 +185,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: const Color(0xFFF2FBFF),
-        title: Text(widget.level.country.flag + '  PÁLYA TELJESÍTVE!',
+        title: Text(widget.level.country.flag + '  ' + GameL10n.tr('PÁLYA TELJESÍTVE!'),
           style: const TextStyle(color: Color(0xFF174A70),
               fontWeight: FontWeight.w900)),
         content: Column(
@@ -109,14 +195,14 @@ class _DispatchScreenState extends State<DispatchScreen> {
                 List.filled(3 - stars, '☆').join(),
               style: const TextStyle(fontSize: 39)),
             const SizedBox(height: 9),
-            Text(widget.level.title,
+            Text(widget.level.localizedTitle,
               style: const TextStyle(color: Color(0xFF174A70),
                   fontSize: 18, fontWeight: FontWeight.w800)),
             Text(simulation.score.toString() + ' pont • ' +
                   simulation.completedLegs.toString() + ' sikeres menet',
               style: const TextStyle(color: Color(0xFF416D84))),
             const SizedBox(height: 7),
-            Text(unlocked ? 'Új pálya feloldva!' : 'A kampány végére értél!',
+            Text(unlocked ? GameL10n.tr('Új pálya feloldva!') : GameL10n.tr('A kampány végére értél!'),
               style: const TextStyle(color: Color(0xFF2A8E62),
                   fontWeight: FontWeight.w800)),
           ],
@@ -127,7 +213,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
               Navigator.pop(dialogContext);
               widget.onExit();
             },
-            child: const Text('PÁLYAVÁLASZTÓ'),
+            child: Text(GameL10n.tr('PÁLYAVÁLASZTÓ')),
           ),
           if (unlocked)
             FilledButton.icon(
@@ -136,7 +222,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
                 widget.onNext(next);
               },
               icon: const Icon(Icons.skip_next_rounded),
-              label: const Text('KÖVETKEZŐ PÁLYA'),
+              label: Text(GameL10n.tr('KÖVETKEZŐ PÁLYA')),
             ),
         ],
       ),
@@ -148,7 +234,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('VÉGE A SZOLGÁLATNAK'),
+        title: Text(GameL10n.tr('VÉGE A SZOLGÁLATNAK')),
         content: Text('Elfogytak az életeid. Pontszám: ' +
             simulation.score.toString() +
             '\nAz eredmény bekerült a helyi ranglistába.'),
@@ -158,7 +244,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
               Navigator.pop(dialogContext);
               _finishShift(save: false);
             },
-            child: const Text('FŐMENÜ'),
+            child: Text(GameL10n.tr('FŐMENÜ')),
           ),
           FilledButton(
             onPressed: () {
@@ -167,7 +253,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
               setState(() => selectedTrainId = null);
               Navigator.pop(dialogContext);
             },
-            child: const Text('ÚJRA'),
+            child: Text(GameL10n.tr('ÚJRA')),
           ),
         ],
       ),
@@ -186,7 +272,8 @@ class _DispatchScreenState extends State<DispatchScreen> {
   Future<void> _openSettings() async {
     await showSettings(context, widget.store);
     if (!mounted) return;
-    simulation.setAutomatic(widget.store.autoDispatch);
+    simulation.setAutomatic(_tutorial?.active == true
+        ? false : widget.store.autoDispatch);
     simulation.setRiskMode(widget.store.riskMode);
     simulation.setMultiplier(widget.store.speed);
   }
@@ -305,6 +392,62 @@ class _DispatchScreenState extends State<DispatchScreen> {
     );
   }
 
+  Widget _hazardBanner() {
+    final alert = simulation.activeHazard;
+    if (alert == null) return const SizedBox.shrink();
+    return TutorialTarget(
+      active: true,
+      child: Material(
+        color: const Color(0xFFFFE2E2),
+        elevation: 12,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(9),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFDD4354), width: 3),
+          ),
+          child: Row(children: [
+            const Icon(Icons.warning_amber_rounded,
+              color: Color(0xFFC92840), size: 27),
+            const SizedBox(width: 7),
+            Expanded(child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(GameL10n.tr('Gyalogos a síneken!'),
+                  style: const TextStyle(color: Color(0xFF9B2339),
+                    fontWeight: FontWeight.w900, fontSize: 14)),
+                Text(GameL10n.tr(
+                  'A vonatok megálltak. Biztosítsd a pályát a folytatáshoz.'),
+                  maxLines: 2,
+                  style: const TextStyle(color: Color(0xFF763442),
+                    fontSize: 10)),
+                Text(alert.secondsToRespond.ceil().toString() + ' s',
+                  style: const TextStyle(color: Color(0xFFB32B43),
+                    fontWeight: FontWeight.bold, fontSize: 11)),
+              ],
+            )),
+            const SizedBox(width: 5),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFC82F47)),
+              onPressed: () {
+                if (simulation.secureHazard()) {
+                  _warn(GameL10n.tr('Sikeres beavatkozás: +80 pont'));
+                }
+              },
+              child: Text(GameL10n.tr('BIZTOSÍTOM A PÁLYÁT'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 10,
+                  fontWeight: FontWeight.w900)),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
   Widget _noticeBanner() {
     return Material(
       elevation: 7,
@@ -348,6 +491,10 @@ class _DispatchScreenState extends State<DispatchScreen> {
   }
 
   void _selectStation(String id) {
+    if (_tutorial?.step == TutorialStep.openStationMenu) {
+      id = 'fenyvesliget';
+      _advanceTutorial(TutorialAction.openedStation);
+    }
     setState(() {
       selectedStationId = id;
       selectedTrainId = null;
@@ -356,12 +503,17 @@ class _DispatchScreenState extends State<DispatchScreen> {
   }
 
   void _selectTrain(String id) {
+    if (_tutorial?.step == TutorialStep.selectTrain && id == 'S 2412') {
+      setState(() => selectedTrainId = id);
+      _advanceTutorial(TutorialAction.selectedTrain);
+      return;
+    }
     setState(() => selectedTrainId = id);
     if (MediaQuery.sizeOf(context).width < 1030) _showInfoSheet();
   }
 
-  void _showInfoSheet() {
-    showModalBottomSheet<void>(
+  Future<void> _showInfoSheet() async {
+    await showModalBottomSheet<void>(
       context: context,
       backgroundColor: _surface,
       isScrollControlled: true,
@@ -376,13 +528,18 @@ class _DispatchScreenState extends State<DispatchScreen> {
         child: SizedBox(
           height: MediaQuery.sizeOf(context).height * 0.83,
           child: AnimatedBuilder(
-            animation: simulation,
+            animation: Listenable.merge([
+              simulation, if (_tutorial != null) _tutorial!,
+            ]),
             builder: (context, _) => _details(),
           ),
         ),
         ),
       ),
     );
+    if (mounted && _tutorial?.step == TutorialStep.closeStationMenu) {
+      _advanceTutorial(TutorialAction.closedStation);
+    }
   }
 
   @override
@@ -433,7 +590,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
                   left: 6, bottom: 9,
                   child: _squareAction(
                     icon: Icons.center_focus_strong,
-                    tooltip: 'Térkép középre',
+                    tooltip: GameL10n.tr('Térkép középre'),
                     onTap: game.recenter,
                   ),
                 ),
@@ -443,6 +600,29 @@ class _DispatchScreenState extends State<DispatchScreen> {
                   bottom: 9,
                   child: _navigation(compact),
                 ),
+                if (_tutorial != null && _tutorial!.active)
+                  Positioned(
+                    top: compact ? 151 : 84,
+                    left: compact ? 204 : 302,
+                    right: compact ? 198 : 360,
+                    child: TutorialCoach(
+                      guide: _tutorial!, compact: compact,
+                      onBegin: () {
+                        _advanceTutorial(TutorialAction.begin);
+                        simulation.setRunning(true);
+                      },
+                    ),
+                  ),
+                if (simulation.hasHazard)
+                  Positioned(
+                    top: compact ? 204 : 205,
+                    left: compact ? 200 : 340,
+                    right: compact ? 126 : 340,
+                    child: AnimatedBuilder(
+                      animation: simulation,
+                      builder: (_, __) => _hazardBanner(),
+                    ),
+                  ),
                 if (_activeHint != null)
                   Positioned(
                     top: compact ? 139 : 85,
@@ -460,7 +640,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
                 if (widget.store.showHints && !compact)
                   Positioned(
                     right: 205, bottom: 92,
-                    child: _softTag('↔  Két ujjal nagyítható és mozgatható'),
+                    child: _softTag('↔  ' + GameL10n.tr('Két ujjal nagyítható és mozgatható')),
                   ),
               ],
             );
@@ -478,14 +658,14 @@ class _DispatchScreenState extends State<DispatchScreen> {
         children: [
           _logo(compact),
           const SizedBox(width: 7),
-          _statCard(Icons.stars_rounded, 'PONT',
+          _statCard(Icons.stars_rounded, GameL10n.tr('PONT'),
               simulation.score.toString(), const Color(0xFFFFCB55)),
           const SizedBox(width: 7),
-          _statCard(Icons.favorite_rounded, 'ÉLET',
+          _statCard(Icons.favorite_rounded, GameL10n.tr('ÉLET'),
               simulation.lives.toString() + '/3',
               const Color(0xFFFF677A)),
           const SizedBox(width: 7),
-          _statCard(Icons.timer_rounded, 'MŰSZAK',
+          _statCard(Icons.timer_rounded, GameL10n.tr('MŰSZAK'),
               simulation.clock, const Color(0xFF53DCD3)),
           const SizedBox(width: 7),
           _levelCard(),
@@ -556,7 +736,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(stage.country.flag + ' ' + stage.number.toString() +
-                '/10 PÁLYA',
+                '/10 ' + GameL10n.tr('PÁLYA'),
                 style: const TextStyle(color: Color(0xFF184E78),
                     fontWeight: FontWeight.w900, fontSize: 11)),
             const SizedBox(height: 3),
@@ -569,7 +749,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
               )),
             const SizedBox(height: 2),
             Text(simulation.completedLegs.toString() + '/' +
-                stage.requiredArrivals.toString() + ' menet',
+                stage.requiredArrivals.toString() + ' ' + GameL10n.tr('menet'),
                 style: const TextStyle(color: Color(0xFF406A88),
                     fontSize: 9, fontWeight: FontWeight.w700)),
           ],
@@ -595,7 +775,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
                 const Icon(Icons.fact_check_rounded,
                     color: Color(0xFF2788BB), size: 18),
                 const SizedBox(width: 5),
-                const Expanded(child: Text('MAI FELADATOK',
+                Expanded(child: Text(GameL10n.tr('MAI FELADATOK'),
                   style: TextStyle(color: Color(0xFF153E62),
                     fontSize: 11, fontWeight: FontWeight.w900))),
                 Icon(_missionsExpanded ? Icons.expand_less : Icons.expand_more,
@@ -621,11 +801,11 @@ class _DispatchScreenState extends State<DispatchScreen> {
                 ])
               else ...[
                 const Divider(height: 10),
-                _missionRow('Sikeres menetek', simulation.completedLegs,
+                _missionRow(GameL10n.tr('Sikeres menetek'), simulation.completedLegs,
                   target, const Color(0xFF31CC83)),
-                _missionRow('Gyűjts pontokat', simulation.score,
+                _missionRow(GameL10n.tr('Gyűjts pontokat'), simulation.score,
                   target * 120, const Color(0xFFFFB93B)),
-                _missionRow('Balesetmentes', 3 - simulation.collisionCount,
+                _missionRow(GameL10n.tr('Balesetmentes'), 3 - simulation.collisionCount,
                   3, const Color(0xFF459DDF)),
               ],
             ],
@@ -663,36 +843,42 @@ class _DispatchScreenState extends State<DispatchScreen> {
   Widget _tools(bool compact) {
     return Row(mainAxisSize: MainAxisSize.min, children: [
       _squareAction(icon: Icons.settings_rounded,
-        tooltip: 'Beállítások', onTap: _openSettings),
+        tooltip: GameL10n.tr('BEÁLLÍTÁSOK'), onTap: _openSettings),
       const SizedBox(width: 5),
       _squareAction(icon: simulation.running
           ? Icons.pause_rounded : Icons.play_arrow_rounded,
-        tooltip: 'Szünet / folytatás',
+        tooltip: GameL10n.tr('Szünet / folytatás'),
         onTap: () => simulation.setRunning(!simulation.running)),
       const SizedBox(width: 5),
       _speedControl(),
       const SizedBox(width: 5),
       _helpAction(),
       const SizedBox(width: 5),
-      _squareAction(icon: simulation.automatic
+      TutorialTarget(
+        active: _tutorial?.step == TutorialStep.enableAutomatic,
+        child: _squareAction(icon: simulation.automatic
           ? Icons.smart_toy_rounded : Icons.tune_rounded,
-        tooltip: 'Automatikus / kézi forgalom',
+        tooltip: GameL10n.tr('Automatikus / kézi forgalom'),
         onTap: () {
           simulation.setAutomatic(!simulation.automatic);
           widget.store.setAuto(simulation.automatic);
+          if (simulation.automatic) {
+            _advanceTutorial(TutorialAction.enabledAutomatic);
+          }
         }),
+      ),
       if (!compact) ...[
         const SizedBox(width: 5),
         _squareAction(icon: Icons.zoom_in_rounded,
-          tooltip: 'Nagyítás', onTap: () => game.zoom(1.25)),
+          tooltip: GameL10n.tr('Nagyítás'), onTap: () => game.zoom(1.25)),
         const SizedBox(width: 5),
         _squareAction(icon: Icons.zoom_out_rounded,
-          tooltip: 'Kicsinyítés', onTap: () => game.zoom(.8)),
+          tooltip: GameL10n.tr('Kicsinyítés'), onTap: () => game.zoom(.8)),
       ],
       const SizedBox(width: 5),
       _squareAction(icon: Icons.warning_amber_rounded,
         tooltip: simulation.emergency
-            ? 'Vészleállítás feloldása' : 'Vészleállítás',
+            ? 'Resume traffic' : GameL10n.tr('Vészleállítás'),
         danger: simulation.emergency,
         onTap: () => simulation.setEmergency(!simulation.emergency)),
     ]);
@@ -701,12 +887,12 @@ class _DispatchScreenState extends State<DispatchScreen> {
   Widget _speedControl() {
     final current = simulation.timeMultiplier;
     return PopupMenuButton<int>(
-      tooltip: 'Játéksebesség: ' + current.toString() + '×',
+      tooltip: GameL10n.tr('Játéksebesség') + ': ' + current.toString() + '×',
       initialValue: current,
       onSelected: (next) {
         simulation.setMultiplier(next);
         widget.store.setSpeed(next);
-        _warn('Játéksebesség: ' + next.toString() + '×');
+        _warn(GameL10n.tr('Játéksebesség') + ': ' + next.toString() + '×');
       },
       itemBuilder: (_) => [
         for (final speed in const [1, 10, 30, 60])
@@ -807,10 +993,21 @@ class _DispatchScreenState extends State<DispatchScreen> {
   }
 
   Widget _selectedCard(bool compact) {
-    final train = selectedTrainId == null
-        ? null : simulation.train(selectedTrainId!);
-    return GestureDetector(
-      onTap: _showInfoSheet,
+    final train = _tutorial?.step == TutorialStep.selectTrain
+        ? simulation.train('S 2412')
+        : selectedTrainId == null
+            ? null : simulation.train(selectedTrainId!);
+    final learningTrain = _tutorial?.step == TutorialStep.selectTrain;
+    return TutorialTarget(
+      active: learningTrain,
+      child: GestureDetector(
+      onTap: () {
+        if (learningTrain) {
+          _selectTrain('S 2412');
+        } else {
+          _showInfoSheet();
+        }
+      },
       child: SizedBox(
         width: compact ? 212 : 264,
         child: _playfulCard(
@@ -835,8 +1032,8 @@ class _DispatchScreenState extends State<DispatchScreen> {
                   style: const TextStyle(color: Color(0xFF153E61),
                     fontWeight: FontWeight.w900, fontSize: 15)),
                 const SizedBox(height: 3),
-                Text(train == null ? 'Állomásvezérlés megnyitása'
-                    : (train.moving ? 'ÚTON' : 'INDULÁSRA VÁR'),
+                Text(train == null ? GameL10n.tr('Állomásvezérlés megnyitása')
+                    : GameL10n.tr(train.moving ? 'ÚTON' : 'INDULÁSRA VÁR'),
                   maxLines: 2, overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: Color(0xFF336E82),
                     fontSize: 10, fontWeight: FontWeight.w700)),
@@ -847,11 +1044,14 @@ class _DispatchScreenState extends State<DispatchScreen> {
           ]),
         ),
       ),
+    ),
     );
   }
 
   Widget _dispatchButton(bool compact) {
-    return Material(
+    return TutorialTarget(
+      active: _tutorial?.step == TutorialStep.departTrain,
+      child: Material(
       borderRadius: BorderRadius.circular(23),
       elevation: 8,
       shadowColor: const Color(0x88599C20),
@@ -867,10 +1067,10 @@ class _DispatchScreenState extends State<DispatchScreen> {
               begin: Alignment.topCenter, end: Alignment.bottomCenter),
             border: Border.all(color: Colors.white, width: 3),
             borderRadius: BorderRadius.circular(23)),
-          child: const Row(
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.play_arrow_rounded,
+              const Icon(Icons.play_arrow_rounded,
                   color: Color(0xFF135631), size: 32),
               Text('INDÍTÁS', style: TextStyle(
                   color: Color(0xFF135631),
@@ -879,20 +1079,27 @@ class _DispatchScreenState extends State<DispatchScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 
   Widget _navigation(bool compact) {
     final items = <(String, IconData, VoidCallback)>[
-      ('Hálózat', Icons.map_rounded, game.recenter),
-      ('Állomás', Icons.holiday_village_rounded, () {
-        setState(() => selectedTrainId = null);
+      (GameL10n.tr('Hálózat'), Icons.map_rounded, game.recenter),
+      (GameL10n.tr('Állomás'), Icons.holiday_village_rounded, () {
+        setState(() {
+          selectedTrainId = null;
+          if (_tutorial?.step == TutorialStep.openStationMenu) {
+            selectedStationId = 'fenyvesliget';
+          }
+        });
+        _advanceTutorial(TutorialAction.openedStation);
         _showInfoSheet();
       }),
-      ('Járatok', Icons.train_rounded, _showTrainList),
-      ('Ranglista', Icons.emoji_events_rounded,
+      (GameL10n.tr('Járatok'), Icons.train_rounded, _showTrainList),
+      (GameL10n.tr('Ranglista'), Icons.emoji_events_rounded,
           () => showLeaderboard(context, widget.store)),
-      ('Menü', Icons.home_rounded, () => _finishShift()),
+      (GameL10n.tr('Menü'), Icons.home_rounded, () => _finishShift()),
     ];
     return Container(
       height: compact ? 53 : 62,
@@ -906,7 +1113,10 @@ class _DispatchScreenState extends State<DispatchScreen> {
       ),
       child: Row(children: [
         for (final item in items)
-          Expanded(child: InkWell(
+          Expanded(child: TutorialTarget(
+            active: _tutorial?.step == TutorialStep.openStationMenu &&
+                item.$1 == GameL10n.tr('Állomás'),
+            child: InkWell(
             onTap: item.$3,
             borderRadius: BorderRadius.circular(16),
             child: Column(
@@ -921,6 +1131,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
                     fontSize: compact ? 9 : 11)),
               ],
             ),
+          ),
           )),
       ]),
     );
@@ -948,6 +1159,9 @@ class _DispatchScreenState extends State<DispatchScreen> {
       _warn('A vonat nem indítható.');
       return;
     }
+    if (train.number == 'S 2412') {
+      _advanceTutorial(TutorialAction.dispatchedTrain);
+    }
     _warn(train.number + ': indulási engedély rögzítve.');
   }
 
@@ -961,7 +1175,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
         child: ListView(
           padding: const EdgeInsets.all(14),
           children: [
-            const Text('JÁRATOK', style: TextStyle(
+            Text(GameL10n.tr('Járatok'), style: const TextStyle(
               color: Color(0xFF124469),
               fontSize: 19, fontWeight: FontWeight.w900)),
             for (final t in simulation.trains)
@@ -987,30 +1201,73 @@ class _DispatchScreenState extends State<DispatchScreen> {
 
   Widget _details() {
     final train = selectedTrainId == null
-        ? null
-        : simulation.train(selectedTrainId!);
+        ? null : simulation.train(selectedTrainId!);
     final station = simulation.station(selectedStationId);
+    final tutorialSheet = _tutorial != null && _tutorial!.inStation;
     return Container(
       decoration: BoxDecoration(
         color: _surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF84BEDB), width: 2),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: ListView(
-        children: [
-          Text(
-            train == null ? 'ÁLLOMÁSI IRÁNYÍTÁS' : 'SZERELVÉNY ADATAI',
-            style: const TextStyle(
-              color: _accent, fontWeight: FontWeight.w700,
-              fontSize: 11, letterSpacing: 1.6,
+        border: Border.all(color: const Color(0xFF84BEDB), width: 2)),
+      padding: const EdgeInsets.all(10),
+      child: Column(children: [
+        if (tutorialSheet)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 5),
+            child: TutorialCoach(guide: _tutorial!, compact: true)),
+        Row(children: [
+          Expanded(child: Text(train == null
+              ? GameL10n.tr('ÁLLOMÁSI IRÁNYÍTÁS')
+              : GameL10n.tr('SZERELVÉNY ADATAI'),
+            style: const TextStyle(color: _accent,
+              fontWeight: FontWeight.w900, fontSize: 12))),
+          TutorialTarget(
+            active: _tutorial?.step == TutorialStep.closeStationMenu,
+            child: FilledButton.tonalIcon(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.map_rounded, size: 18),
+              label: Text(GameL10n.tr('Hálózat')),
             ),
           ),
-          const SizedBox(height: 12),
-          if (train != null) _trainDetails(train)
-          else _stationDetails(station),
+        ]),
+        if (train == null) ...[
+          const SizedBox(height: 7),
+          SizedBox(height: 39,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                for (final item in simulation.stations) ...[
+                  TutorialTarget(
+                    active: _tutorial?.step ==
+                        TutorialStep.chooseReceivingStation &&
+                        item.id == 'korospatak',
+                    child: ChoiceChip(
+                      selected: selectedStationId == item.id,
+                      label: Text(GameL10n.tr(item.name),
+                        style: const TextStyle(fontSize: 11)),
+                      onSelected: (_) {
+                        setState(() => selectedStationId = item.id);
+                        if (item.id == 'korospatak') {
+                          _advanceTutorial(TutorialAction.selectedReceiver);
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+              ],
+            ),
+          ),
         ],
-      ),
+        const SizedBox(height: 5),
+        Expanded(child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          children: [
+            if (train != null) _trainDetails(train)
+            else _stationDetails(station),
+          ],
+        )),
+      ]),
     );
   }
 
@@ -1025,15 +1282,15 @@ class _DispatchScreenState extends State<DispatchScreen> {
         const SizedBox(height: 4),
         Text(train.typeLabel, style: const TextStyle(color: _muted)),
         const Divider(height: 24),
-        _dataRow('Mozdonyvezető', train.driver),
-        _dataRow('Indulás', current),
-        _dataRow('Következő', next),
-        _dataRow('Sebesség',
+        _dataRow(GameL10n.tr('Mozdonyvezető'), train.driver),
+        _dataRow(GameL10n.tr('Indulás'), current),
+        _dataRow(GameL10n.tr('Következő'), next),
+        _dataRow(GameL10n.tr('Sebesség'),
             train.moving ? '${train.speedKmH.round()} km/h' : '0 km/h'),
-        _dataRow('Állapot',
+        _dataRow(GameL10n.tr('Állapot'),
             train.moving ? 'Úton, ${(train.progress * 100).round()}%'
-                : 'Állomáson vár'),
-        _dataRow('Teljesített szakaszok', '${train.completedLegs}'),
+                : GameL10n.tr('Állomáson vár')),
+        _dataRow(GameL10n.tr('Teljesített szakaszok'), '${train.completedLegs}'),
         const SizedBox(height: 12),
         if (!simulation.automatic && !train.moving) ...[
           FilledButton.icon(
@@ -1043,20 +1300,20 @@ class _DispatchScreenState extends State<DispatchScreen> {
               }
             },
             icon: const Icon(Icons.check_circle_outline),
-            label: const Text('Indulás engedélyezése'),
+            label: Text(GameL10n.tr('Indulás engedélyezése')),
           ),
           if (simulation.riskMode) ...[
             const SizedBox(height: 7),
             OutlinedButton.icon(
               onPressed: () => _unsafe(train.number),
               icon: const Icon(Icons.warning_amber, color: Color(0xFFF16A74)),
-              label: const Text('KOCKÁZATOS INDÍTÁS'),
+              label: Text(GameL10n.tr('KOCKÁZATOS INDÍTÁS')),
             ),
           ],
         ],
         TextButton(
           onPressed: () => setState(() => selectedTrainId = null),
-          child: const Text('Vissza az állomáshoz'),
+          child: Text(GameL10n.tr('Vissza az állomáshoz')),
         ),
       ],
     );
@@ -1068,6 +1325,8 @@ class _DispatchScreenState extends State<DispatchScreen> {
         station: station,
         onRejected: _warn,
         hint: _activeHint,
+        tutorial: _tutorial,
+        onTutorialAction: _advanceTutorial,
         onAutomatic: (enabled) {
           simulation.setAutomatic(enabled);
           widget.store.setAuto(enabled);

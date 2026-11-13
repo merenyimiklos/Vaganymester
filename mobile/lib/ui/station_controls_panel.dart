@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../game/simulation.dart';
 import '../game/help_advisor.dart';
+import '../game/tutorial_guide.dart';
+import '../l10n/game_l10n.dart';
+import 'tutorial_coach.dart';
 
 const _mint = Color(0xFF177DAA);
 const _danger = Color(0xFFF16A74);
@@ -14,6 +17,8 @@ class StationControlsPanel extends StatelessWidget {
     required this.onRejected,
     required this.onAutomatic,
     this.hint,
+    this.tutorial,
+    this.onTutorialAction,
   });
 
   final RailwaySimulation simulation;
@@ -21,6 +26,8 @@ class StationControlsPanel extends StatelessWidget {
   final void Function(String) onRejected;
   final ValueChanged<bool> onAutomatic;
   final HelpSuggestion? hint;
+  final TutorialGuide? tutorial;
+  final ValueChanged<TutorialAction>? onTutorialAction;
 
   bool get _showHint => hint != null && hint!.stationId == station.id;
 
@@ -52,7 +59,7 @@ class StationControlsPanel extends StatelessWidget {
         ),
         Text(station.name, style: const TextStyle(
             fontSize: 22, fontWeight: FontWeight.w800)),
-        Text('Peronfoglaltság: ' +
+        Text(GameL10n.tr('Peronfoglaltság') + ': ' +
             simulation.reservedPlatforms(station.id).toString() +
             ' / ' + station.platforms.toString(),
           style: const TextStyle(color: Color(0xFFA9C5D2))),
@@ -60,23 +67,23 @@ class StationControlsPanel extends StatelessWidget {
         SwitchListTile.adaptive(
           dense: true,
           contentPadding: EdgeInsets.zero,
-          title: const Text('Automata irányítás'),
-          subtitle: const Text('Kézi módban állíts váltókat és jelzőket'),
+          title: Text(GameL10n.tr('Automata irányítás')),
+          subtitle: Text(GameL10n.tr('Kézi módban állíts váltókat és jelzőket')),
           value: simulation.automatic,
           onChanged: onAutomatic,
         ),
         const Divider(),
-        _side('NYUGATI BIZTOSÍTÁS', RailwaySide.west, c),
+        _side(GameL10n.tr('NYUGATI BIZTOSÍTÁS'), RailwaySide.west, c),
         const Divider(),
-        _side('KELETI BIZTOSÍTÁS', RailwaySide.east, c),
+        _side(GameL10n.tr('KELETI BIZTOSÍTÁS'), RailwaySide.east, c),
         const Divider(),
-        const Text('ÁLLOMÁSI VÁGÁNYOK',
+        Text(GameL10n.tr('ÁLLOMÁSI VÁGÁNYOK'),
             style: TextStyle(color: _mint, fontWeight: FontWeight.bold)),
         const SizedBox(height: 6),
         for (var track = 0; track < station.platforms; track++)
           _trackRow(c, track),
         const Divider(),
-        const Text('VONALI VÁGÁNYZÁRAK',
+        Text(GameL10n.tr('VONALI VÁGÁNYZÁRAK'),
             style: TextStyle(color: _mint, fontWeight: FontWeight.bold)),
         for (final section in related)
           SwitchListTile.adaptive(
@@ -105,14 +112,16 @@ class StationControlsPanel extends StatelessWidget {
         Text(title, style: const TextStyle(
             fontWeight: FontWeight.w700, color: _mint, fontSize: 12)),
         const SizedBox(height: 7),
-        Text('Váltó állása: ' + (current + 1).toString() + '. vágány',
+        Text(GameL10n.tr('Váltó állása') + ': ' + (current + 1).toString() + '.',
             style: const TextStyle(fontSize: 12)),
         const SizedBox(height: 5),
         Wrap(
           spacing: 6, runSpacing: 4,
           children: [
             for (var index = 0; index < station.platforms; index++)
-              ChoiceChip(
+              TutorialTarget(
+                active: _highlightSwitch(side, index),
+                child: ChoiceChip(
                 backgroundColor: _showHint &&
                     hint!.focus == HintFocus.turnout &&
                     hint!.side == side && hint!.track == index
@@ -125,19 +134,33 @@ class StationControlsPanel extends StatelessWidget {
                 onSelected: disabled ? null : (_) {
                   if (!simulation.setTurnout(station.id, side, index)) {
                     onRejected('A váltó foglalt vagy lezárt vágányra mutat.');
+                  } else if (_highlightSwitch(side, index)) {
+                    onTutorialAction?.call(station.id == 'fenyvesliget'
+                        ? TutorialAction.changedOriginSwitch
+                        : TutorialAction.changedDestinationSwitch);
                   }
                 },
+              ),
               ),
           ],
         ),
         const SizedBox(height: 7),
         _signalButton(side, SignalKind.entry,
-            'BEJÁRATI JELZŐ', c, disabled),
+            GameL10n.tr('BEJÁRATI JELZŐ'), c, disabled),
         const SizedBox(height: 6),
         _signalButton(side, SignalKind.exit,
-            'KIJÁRATI JELZŐ', c, disabled),
+            GameL10n.tr('KIJÁRATI JELZŐ'), c, disabled),
       ],
     );
+  }
+
+  bool _highlightSwitch(RailwaySide side, int index) {
+    final step = tutorial?.step;
+    return index == 1 &&
+        ((step == TutorialStep.originSwitch &&
+              station.id == 'fenyvesliget' && side == RailwaySide.east) ||
+         (step == TutorialStep.destinationSwitch &&
+              station.id == 'korospatak' && side == RailwaySide.west));
   }
 
   Widget _signalButton(RailwaySide side, SignalKind kind, String title,
@@ -147,7 +170,16 @@ class StationControlsPanel extends StatelessWidget {
         ? HintFocus.entrySignal : HintFocus.exitSignal;
     final highlighted = _showHint && hint!.focus == focus &&
         hint!.side == side;
-    return SizedBox(
+    final tutorialHighlighted =
+        (tutorial?.step == TutorialStep.exitSignal &&
+          station.id == 'fenyvesliget' &&
+          side == RailwaySide.east && kind == SignalKind.exit) ||
+        (tutorial?.step == TutorialStep.entrySignal &&
+          station.id == 'korospatak' &&
+          side == RailwaySide.west && kind == SignalKind.entry);
+    return TutorialTarget(
+      active: tutorialHighlighted,
+      child: SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
         style: OutlinedButton.styleFrom(
@@ -161,11 +193,17 @@ class StationControlsPanel extends StatelessWidget {
         onPressed: disabled ? null : () {
           if (!simulation.setSignal(station.id, side, kind, !green)) {
             onRejected('Nem állítható szabadra: foglalt vagy lezárt vágányút.');
+          } else if (!green && tutorialHighlighted) {
+            onTutorialAction?.call(kind == SignalKind.exit
+                ? TutorialAction.clearedExitSignal
+                : TutorialAction.clearedEntrySignal);
           }
         },
         icon: Icon(Icons.circle, color: green ? _mint : _danger, size: 13),
-        label: Text(title + ': ' + (green ? 'SZABAD' : 'MEGÁLLJ'),
+        label: Text(title + ': ' +
+              GameL10n.tr(green ? 'SZABAD' : 'MEGÁLLJ'),
             style: const TextStyle(fontSize: 11)),
+      ),
       ),
     );
   }

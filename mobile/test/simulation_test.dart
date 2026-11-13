@@ -65,6 +65,7 @@ void main() {
     sim.setAutomatic(false);
     pump(sim);
     expect(sim.movingCount, 0);
+    expect(sim.setTurnout('fenyvesliget', RailwaySide.east, 1), isTrue);
     expect(sim.setTurnout('korospatak', RailwaySide.west, 1), isTrue);
     expect(sim.setSignal('fenyvesliget',
         RailwaySide.east, SignalKind.exit, true), isTrue);

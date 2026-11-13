@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/session_store.dart';
 import '../game/help_inventory.dart';
+import '../l10n/game_l10n.dart';
 
 /// The chest shelf and consumable help library. No payments or chance-based
 /// loot: every chest guarantees two assistance items.
@@ -44,17 +45,17 @@ class _HelpCenterSheetState extends State<HelpCenterSheet> {
                       color: Color(0xFF94650D), size: 29),
                 ),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('SEGÍTSÉGEK ÉS LÁDÁK',
+                      Text(GameL10n.tr('SEGÍTSÉGEK ÉS LÁDÁK'),
                         style: TextStyle(
                           color: Color(0xFF174A6F),
                           fontWeight: FontWeight.w900,
                           fontSize: 17,
                         )),
-                      Text('Ha elakadsz, kérj egy célzott tippet!',
+                      Text(GameL10n.tr('Ha elakadsz, kérj egy célzott tippet!'),
                         style: TextStyle(
                             color: Color(0xFF487C94), fontSize: 12)),
                     ],
@@ -88,7 +89,7 @@ class _HelpCenterSheetState extends State<HelpCenterSheet> {
                           style: const TextStyle(
                               color: Color(0xFF694912),
                               fontWeight: FontWeight.w900)),
-                        const Text('Minden ládában 2 garantált segítség.',
+                        Text(GameL10n.tr('Minden ládában 2 garantált segítség.'),
                           style: TextStyle(
                               color: Color(0xFF805B22), fontSize: 11)),
                       ],
@@ -96,7 +97,7 @@ class _HelpCenterSheetState extends State<HelpCenterSheet> {
                     FilledButton.icon(
                       onPressed: stock.chests > 0 ? _openChest : null,
                       icon: const Icon(Icons.card_giftcard_rounded),
-                      label: const Text('FELNYITÁS'),
+                      label: Text(GameL10n.tr('FELNYITÁS')),
                     ),
                   ]),
                 ),
@@ -105,14 +106,14 @@ class _HelpCenterSheetState extends State<HelpCenterSheet> {
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 9),
                   child: Text('🎁 Kaptál: ' +
-                      _lastRewards.map((item) => item.title).join(' + '),
+                      _lastRewards.map((item) => GameL10n.tr(item.title)).join(' + '),
                     style: const TextStyle(
                         color: Color(0xFF21794D),
                         fontWeight: FontWeight.w800,
                         fontSize: 12)),
                 ),
               const SizedBox(height: 11),
-              const Text('FELHASZNÁLHATÓ SEGÍTSÉGEK',
+              Text(GameL10n.tr('FELHASZNÁLHATÓ SEGÍTSÉGEK'),
                 style: TextStyle(color: Color(0xFF174A6F),
                     fontWeight: FontWeight.w900, fontSize: 13)),
               const SizedBox(height: 7),
@@ -157,12 +158,12 @@ class _HelpCenterSheetState extends State<HelpCenterSheet> {
         Expanded(child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(item.title, style: const TextStyle(
+            Text(GameL10n.tr(item.title), style: const TextStyle(
               color: Color(0xFF194C71),
               fontSize: 13,
               fontWeight: FontWeight.w900,
             )),
-            Text(item.description, style: const TextStyle(
+            Text(GameL10n.tr(item.description), style: const TextStyle(
               color: Color(0xFF50788C), fontSize: 11)),
           ],
         )),
@@ -181,7 +182,7 @@ class _HelpCenterSheetState extends State<HelpCenterSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               minimumSize: const Size(64, 32),
             ),
-            child: const Text('HASZNÁL',
+            child: Text(GameL10n.tr('HASZNÁL'),
                 style: TextStyle(fontSize: 10)),
           ),
         ]),

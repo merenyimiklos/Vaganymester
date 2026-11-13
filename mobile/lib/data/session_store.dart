@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../game/level_catalog.dart';
 import '../game/campaign_progress.dart';
 import '../game/help_inventory.dart';
+import '../l10n/game_l10n.dart';
 
 class ScoreEntry {
   const ScoreEntry(this.name, this.points, this.when);
@@ -30,6 +31,8 @@ class SessionStore extends ChangeNotifier {
   bool riskMode = false;
   bool showHints = true;
   int speed = 30;
+  String language = 'hu';
+  Set<String> introducedLevels = {};
   List<ScoreEntry> leaderboard = [];
   CampaignProgress campaign = CampaignProgress();
   HelpInventory helpInventory = HelpInventory();
@@ -43,6 +46,12 @@ class SessionStore extends ChangeNotifier {
     riskMode = await _prefs.getBool('setting_risk') ?? false;
     showHints = await _prefs.getBool('setting_hints') ?? true;
     speed = await _prefs.getInt('setting_speed') ?? 30;
+    final savedLanguage = await _prefs.getString('setting_language');
+    language = GameL10n.supported.contains(savedLanguage)
+        ? savedLanguage! : 'hu';
+    GameL10n.language = language;
+    introducedLevels = (await _prefs.getStringList(
+        'introduced_levels:' + (playerName ?? 'guest')) ?? []).toSet();
     await _loadCampaign();
     await _loadHelps();
     final entries = await _prefs.getStringList('scores') ?? [];
@@ -118,6 +127,8 @@ class SessionStore extends ChangeNotifier {
     await _prefs.setString('profile_name', playerName!);
     await _loadCampaign();
     await _loadHelps();
+    introducedLevels = (await _prefs.getStringList(
+        'introduced_levels:' + (playerName ?? 'guest')) ?? []).toSet();
     notifyListeners();
   }
 
@@ -126,6 +137,7 @@ class SessionStore extends ChangeNotifier {
     await _prefs.remove('profile_name');
     campaign = CampaignProgress();
     helpInventory = HelpInventory();
+    introducedLevels = {};
     notifyListeners();
   }
 
@@ -144,6 +156,23 @@ class SessionStore extends ChangeNotifier {
     await _prefs.setBool('setting_hints', value);
     notifyListeners();
   }
+  Future<void> setLanguage(String value) async {
+    if (!GameL10n.supported.contains(value)) return;
+    language = value;
+    GameL10n.language = value;
+    await _prefs.setString('setting_language', value);
+    notifyListeners();
+  }
+
+  Future<void> markIntroduced(GameLevel level) async {
+    if (!introducedLevels.add(level.id)) return;
+    await _prefs.setStringList(
+      'introduced_levels:' + (playerName ?? 'guest'),
+      introducedLevels.toList()..sort(),
+    );
+    notifyListeners();
+  }
+
   Future<void> setSpeed(int value) async {
     if (![1, 10, 30, 60].contains(value)) return;
     speed = value;

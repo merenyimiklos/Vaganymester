@@ -60,7 +60,7 @@ jobs:
 
       - name: Build release APK
         working-directory: mobile
-        run: flutter build apk --release --build-name 0.5.0 --build-number ${{ github.run_number }}
+        run: flutter build apk --release --build-name 0.6.0 --build-number ${{ github.run_number }}
 
       - name: Upload installable APK
         uses: actions/upload-artifact@v4

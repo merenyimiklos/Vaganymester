@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'simulation.dart';
 import 'level_catalog.dart';
+import '../l10n/game_l10n.dart';
 
 /// Original, vector-based, colorful casual-game world.
 /// Everything here is decoration or a visual representation of actual
@@ -497,7 +498,7 @@ class PlayfulStationMarker extends PositionComponent with TapCallbacks {
     )..layout();
     icon.paint(canvas, const Offset(15, 15));
     final name = TextPainter(
-      text: TextSpan(text: station.name,
+      text: TextSpan(text: GameL10n.tr(station.name),
         style: const TextStyle(color: blue,
             fontSize: 16, fontWeight: FontWeight.w900)),
       maxLines: 1, textDirection: TextDirection.ltr,
