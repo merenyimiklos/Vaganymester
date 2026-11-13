@@ -29,7 +29,6 @@ class _CampaignScreenState extends State<CampaignScreen> {
   Widget build(BuildContext context) {
     final country = LevelCatalog.countries
         .firstWhere((c) => c.code == selectedCountry);
-    final progress = widget.store.campaign;
     return Scaffold(
       body: SafeArea(
         child: Stack(children: [
@@ -139,7 +138,7 @@ class _CampaignScreenState extends State<CampaignScreen> {
                       style: const TextStyle(
                           color: _muted, fontSize: 10)),
                   ]),
-                )),
+                ),
                 if (selected)
                   const Icon(Icons.chevron_right, color: _blue, size: 18),
               ]),

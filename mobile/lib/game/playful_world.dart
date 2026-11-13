@@ -133,7 +133,7 @@ class PlayfulWorld extends PositionComponent {
         c.drawLine(Offset(x, 260), Offset(x + 9, 195), palm);
         for (var d = -2; d <= 2; d++) {
           c.drawLine(Offset(x + 9, 195),
-              Offset(x + 9 + 26 * d, 185 + 8 * d.abs()),
+              Offset(x + 9 + 26 * d, 185.0 + 8 * d.abs()),
               Paint()..color = const Color(0xFF32835C)..strokeWidth = 6);
         }
       }

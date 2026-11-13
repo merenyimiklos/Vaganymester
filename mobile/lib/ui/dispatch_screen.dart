@@ -123,7 +123,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
             FilledButton.icon(
               onPressed: () {
                 Navigator.pop(dialogContext);
-                widget.onNext(next!);
+                widget.onNext(next);
               },
               icon: const Icon(Icons.skip_next_rounded),
               label: const Text('KÖVETKEZŐ PÁLYA'),
