@@ -1,0 +1,98 @@
+name: VAGANYMESTER Windows installer
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'Vaganymester/**'
+      - 'installer/**'
+      - '.github/workflows/wpf-installer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  installer:
+    name: Self-contained WPF and branded Setup
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Python for game artwork
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Generate original icon and installer artwork
+        shell: pwsh
+        run: |
+          python -m pip install --quiet Pillow==11.3.0
+          python installer/generate_assets.py
+          if (!(Test-Path 'Vaganymester/Assets/Vaganymester.ico')) {
+            throw 'App icon was not generated.'
+          }
+
+      - name: Build WPF application
+        shell: pwsh
+        run: dotnet build Vaganymester/Vaganymester.csproj --configuration Release --nologo
+
+      - name: Publish self-contained win-x64 single executable
+        shell: pwsh
+        run: |
+          dotnet publish Vaganymester/Vaganymester.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/publish /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true /p:EnableCompressionInSingleFile=true /p:DebugSymbols=false /p:DebugType=None
+          $exe = 'artifacts/publish/Vaganymester.exe'
+          if (!(Test-Path $exe)) { throw 'WPF executable is missing.' }
+          $bytes = (Get-Item $exe).Length
+          if ($bytes -lt 1000000) { throw "Suspiciously small EXE: $bytes" }
+          Write-Host "Self-contained WPF executable: $bytes bytes"
+
+      - name: Install Inno Setup if missing
+        shell: pwsh
+        run: |
+          $pf = [Environment]::GetFolderPath('ProgramFilesX86')
+          $candidates = @("$pf\Inno Setup 7\ISCC.exe", "$pf\Inno Setup 6\ISCC.exe")
+          $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (!$iscc) {
+            choco install innosetup -y --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed.' }
+            $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
+          if (!$iscc) { throw 'ISCC.exe is missing.' }
+          Write-Host "Inno Setup compiler: $iscc"
+          $null = New-Item -ItemType Directory -Force 'artifacts'
+          Set-Content -Path 'artifacts/iscc-path.txt' -Value $iscc
+
+      - name: Compile styled setup EXE
+        shell: pwsh
+        run: |
+          $iscc = (Get-Content 'artifacts/iscc-path.txt' -Raw).Trim()
+          & $iscc 'installer/Vaganymester.iss'
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed: $LASTEXITCODE" }
+          $setup = 'artifacts/installer/Vaganymester-Windows-Setup.exe'
+          if (!(Test-Path $setup)) { throw 'Windows setup is missing.' }
+          Get-Item $setup | Select-Object Name, Length, LastWriteTime
+
+      - name: Calculate SHA256
+        shell: pwsh
+        run: |
+          $setup = 'artifacts/installer/Vaganymester-Windows-Setup.exe'
+          $hash = (Get-FileHash -Algorithm SHA256 $setup).Hash.ToLower()
+          "$hash  Vaganymester-Windows-Setup.exe" | Set-Content -Path 'artifacts/installer/SHA256SUMS.txt' -Encoding ascii
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Vaganymester-Windows-Setup
+          path: |
+            artifacts/installer/Vaganymester-Windows-Setup.exe
+            artifacts/installer/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 90

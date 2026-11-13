@@ -7,5 +7,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Vaganymester</RootNamespace>
     <AssemblyName>Vaganymester</AssemblyName>
+    <Product>VÁGÁNYMESTER</Product>
+    <Authors>VÁGÁNYMESTER</Authors>
+    <Version>0.1.0</Version>
+    <ApplicationIcon Condition="Exists('Assets\Vaganymester.ico')">Assets\Vaganymester.ico</ApplicationIcon>
   </PropertyGroup>
 </Project>
