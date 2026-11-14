@@ -26,6 +26,7 @@
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock Text="Idő: " Foreground="#9FB8C7" VerticalAlignment="Center" Margin="0,0,4,0"/>
                 <TextBlock Text="{Binding ClockText}" FontSize="23" FontWeight="Bold" FontFamily="Consolas" VerticalAlignment="Center" Margin="0,0,18,0"/>
+                <Button Content="◉ HÁLÓZATI TÉRKÉP" Click="Network_Click" ToolTip="Ötállomásos hálózati nézet"/> 
                 <Button Content="{Binding RunButtonText}" Click="PlayPause_Click" Style="{StaticResource AccentButton}"/>
                 <Button Content="+1 mp" ToolTip="A szimuláció egy másodperces léptetése" Click="Step_Click"/>
                 <Button Content="↻  Újraindítás" Click="Reset_Click" Style="{StaticResource DangerButton}"/>
@@ -67,6 +68,8 @@
                     <TextBlock Text="VONAL / BIZTOSÍTÁS" Foreground="#9AB4C3" FontSize="11"/>
                     <CheckBox Content="Vágányút-ellenőrzés bekapcsolva" FontSize="12"
                               IsChecked="{Binding SafetyEnabled, Mode=TwoWay}"/>
+                    <CheckBox Content="Automata jelző- és váltókezelés" FontSize="12"
+                              IsChecked="{Binding AutoDispatchEnabled, Mode=TwoWay}"/>
                 </StackPanel>
             </Border>
         </Grid>
@@ -199,14 +202,29 @@
                                 </ItemsControl.ItemContainerStyle>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Button Tag="{Binding}" Click="Train_Click" Width="76" Height="36"
-                                                Background="{Binding BodyBrush}" BorderBrush="#D9ECF5" BorderThickness="2" Padding="1" ToolTip="{Binding DriverName}">
-                                            <Grid>
-                                                <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                                                <TextBlock Text="{Binding Number}" FontSize="11" FontWeight="Bold" TextAlignment="Center"
-                                                           Foreground="#0A1921" VerticalAlignment="Bottom"/>
-                                                <TextBlock Grid.Row="1" Text="{Binding SpeedLabel}" FontSize="9" TextAlignment="Center"
-                                                           Foreground="#102634"/>
+                                        <Button Tag="{Binding}" Click="Train_Click" Width="80" Height="40"
+                                                Background="Transparent" BorderBrush="Transparent" BorderThickness="0"
+                                                Padding="0" ToolTip="{Binding DriverName}">
+                                            <Grid Margin="1">
+                                                <Border CornerRadius="15,7,7,15" Background="{Binding BodyBrush}"
+                                                        BorderBrush="#D2F4F5" BorderThickness="1"/>
+                                                <Border Height="3" VerticalAlignment="Bottom" Margin="12,0,5,3"
+                                                        Background="#112D3D" CornerRadius="2"/>
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"
+                                                            VerticalAlignment="Top" Margin="8,4,0,0">
+                                                    <Border Width="15" Height="7" CornerRadius="3" Background="#1A394B" Margin="0,0,3,0"/>
+                                                    <Border Width="13" Height="7" CornerRadius="2" Background="#1A394B" Margin="0,0,3,0"/>
+                                                    <Border Width="13" Height="7" CornerRadius="2" Background="#1A394B"/>
+                                                </StackPanel>
+                                                <Border Margin="11,16,5,5" Background="#112A3A" CornerRadius="4" Opacity="0.93"/>
+                                                <StackPanel VerticalAlignment="Bottom" Margin="13,0,7,7">
+                                                    <TextBlock Text="{Binding Number}" FontSize="10" FontWeight="Bold"
+                                                               TextAlignment="Center" Foreground="#F1FCFC"/>
+                                                    <TextBlock Text="{Binding SpeedLabel}" FontSize="8" TextAlignment="Center"
+                                                               Foreground="#B8DBDE"/>
+                                                </StackPanel>
+                                                <Ellipse Width="4" Height="4" Fill="#FFF5D0" HorizontalAlignment="Left"
+                                                         VerticalAlignment="Bottom" Margin="3,0,0,9"/>
                                             </Grid>
                                         </Button>
                                     </DataTemplate>
@@ -219,6 +237,7 @@
                         <StackPanel>
                             <TextBlock Text="{Binding SystemMessage}" Foreground="#F0F6FC" TextWrapping="Wrap" FontSize="12"/>
                             <TextBlock Text="{Binding WaitingSummary}" Foreground="#FBC87D" TextWrapping="Wrap" FontSize="12" Margin="0,4,0,0"/>
+                            <TextBlock Text="{Binding DelaySummary}" Foreground="#F8BBBA" TextWrapping="Wrap" FontSize="12" Margin="0,3,0,0"/>
                         </StackPanel>
                     </Border>
 

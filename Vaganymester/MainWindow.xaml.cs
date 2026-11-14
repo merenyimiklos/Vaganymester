@@ -12,6 +12,7 @@ public partial class MainWindow : Window
     public DispatchEngine Engine { get; } = new();
     private readonly DispatcherTimer _timer;
     private readonly Dictionary<Train, TrainDetailsWindow> _detailsWindows = new();
+    private NetworkWindow? _networkWindow;
     private DateTime _previousTick = DateTime.UtcNow;
 
     public MainWindow()
@@ -26,6 +27,7 @@ public partial class MainWindow : Window
             double dt = Math.Clamp((now - _previousTick).TotalSeconds, 0, 0.10);
             _previousTick = now;
             Engine.Tick(dt);
+            _networkWindow?.Refresh();
         };
         Engine.Trains.CollectionChanged += (_, e) =>
         {
@@ -34,6 +36,21 @@ public partial class MainWindow : Window
                 if (_detailsWindows.TryGetValue(oldTrain, out var window)) window.Close();
         };
         _timer.Start();
+        Loaded += (_, _) => Dispatcher.BeginInvoke(new Action(ShowNetwork), DispatcherPriority.ApplicationIdle);
+    }
+
+    private void Network_Click(object sender, RoutedEventArgs e) => ShowNetwork();
+
+    private void ShowNetwork()
+    {
+        if (_networkWindow is null)
+        {
+            _networkWindow = new NetworkWindow(Engine, ShowTrainDetails) { Owner = this };
+            _networkWindow.Closed += (_, _) => _networkWindow = null;
+        }
+        _networkWindow.Refresh();
+        _networkWindow.Show();
+        _networkWindow.Activate();
     }
 
     private void PlayPause_Click(object sender, RoutedEventArgs e) => Engine.IsRunning = !Engine.IsRunning;
@@ -43,6 +60,7 @@ public partial class MainWindow : Window
     {
         foreach (var window in _detailsWindows.Values.ToList()) window.Close();
         Engine.Reset();
+        _networkWindow?.Refresh();
     }
     private void Step_Click(object sender, RoutedEventArgs e)
     {

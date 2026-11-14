@@ -73,6 +73,86 @@ public sealed class DispatchEngine : BindableBase
     public int CollisionCount { get => _collisionCount; private set => Set(ref _collisionCount, value); }
 
     public int ActiveCount => Trains.Count;
+    public double ElapsedSeconds => _elapsed;
+    public int DelayedCount => Timetable.Count(p => !p.Spawned && _elapsed - p.DueSecond > 15);
+    public string DelaySummary => DelayedCount == 0
+        ? "Nincs 15 másodpercnél nagyobb belépési késés."
+        : $"{DelayedCount} késő vonat vár belépésre.";
+
+    private bool _autoDispatchEnabled;
+    public bool AutoDispatchEnabled
+    {
+        get => _autoDispatchEnabled;
+        set
+        {
+            if (!Set(ref _autoDispatchEnabled, value)) return;
+            Raise(nameof(DispatchModeText));
+            SystemMessage = value ? "AUTOMATA: jelző- és váltóútbeállítás aktív." : "KÉZI ÜZEM: te irányítod a jelzőket és váltókat.";
+            Log(SystemMessage, value ? "success" : "info");
+        }
+    }
+    private bool _interCityPriority = true;
+    public bool InterCityPriority
+    {
+        get => _interCityPriority;
+        set { if (Set(ref _interCityPriority, value)) Log(value ? "InterCity-elsőbbség BE." : "InterCity-elsőbbség KI."); }
+    }
+    private bool _westEntryOpen = true;
+    public bool WestEntryOpen
+    {
+        get => _westEntryOpen;
+        set { if (Set(ref _westEntryOpen, value)) Log(value ? "Nyugati beléptetés engedélyezve." : "Nyugati beléptetés leállítva.", value ? "success" : "warning"); }
+    }
+    private bool _eastEntryOpen = true;
+    public bool EastEntryOpen
+    {
+        get => _eastEntryOpen;
+        set { if (Set(ref _eastEntryOpen, value)) Log(value ? "Keleti beléptetés engedélyezve." : "Keleti beléptetés leállítva.", value ? "success" : "warning"); }
+    }
+    private bool _westExitOpen = true;
+    public bool WestExitOpen
+    {
+        get => _westExitOpen;
+        set { if (Set(ref _westExitOpen, value)) Log(value ? "Nyugati kihaladás engedélyezve." : "Nyugati kihaladás leállítva.", value ? "success" : "warning"); }
+    }
+    private bool _eastExitOpen = true;
+    public bool EastExitOpen
+    {
+        get => _eastExitOpen;
+        set { if (Set(ref _eastExitOpen, value)) Log(value ? "Keleti kihaladás engedélyezve." : "Keleti kihaladás leállítva.", value ? "success" : "warning"); }
+    }
+    private bool _track1Closed;
+    public bool Track1Closed
+    {
+        get => _track1Closed;
+        set
+        {
+            if (!Set(ref _track1Closed, value)) return;
+            Log(value ? "1. vágány: karbantartás miatti lezárás." : "1. vágány: újra használható.", value ? "warning" : "success");
+            if (value) CloseAffectedSignals(0);
+        }
+    }
+    private bool _track2Closed;
+    public bool Track2Closed
+    {
+        get => _track2Closed;
+        set
+        {
+            if (!Set(ref _track2Closed, value)) return;
+            Log(value ? "2. vágány: karbantartás miatti lezárás." : "2. vágány: újra használható.", value ? "warning" : "success");
+            if (value) CloseAffectedSignals(1);
+        }
+    }
+    public string DispatchModeText => AutoDispatchEnabled ? "AUTOMATA ÜZEM" : "KÉZI ÜZEM";
+
+    private void CloseAffectedSignals(int track)
+    {
+        foreach (var signal in Signals.Where(s => s.Track == track || s.Track == -1 &&
+            (s.Direction > 0 ? WestTurnout.Track : EastTurnout.Track) == track))
+            signal.IsGreen = false;
+        UpdateTurnoutLocks();
+    }
+
 
     // A négy vágányszakasz foglaltsága élőben megjelenik a biztosítóberendezési térképen.
     private bool IsBusy(string section) => Trains.Any(t =>
@@ -135,6 +215,16 @@ public sealed class DispatchEngine : BindableBase
         _elapsed = 0;
         _manualCounter = 9000;
         _manualQueue.Clear();
+        _autoDispatchEnabled = false;
+        _westEntryOpen = _eastEntryOpen = _westExitOpen = _eastExitOpen = true;
+        _interCityPriority = true;
+        _track1Closed = _track2Closed = false;
+        foreach (string name in new[]
+        {
+            nameof(AutoDispatchEnabled), nameof(WestEntryOpen), nameof(EastEntryOpen),
+            nameof(WestExitOpen), nameof(EastExitOpen), nameof(InterCityPriority),
+            nameof(Track1Closed), nameof(Track2Closed), nameof(DispatchModeText)
+        }) Raise(name);
         SelectedTrain = null;
         SelectedSignal = null;
         SelectedTurnout = null;
@@ -206,12 +296,15 @@ public sealed class DispatchEngine : BindableBase
         if (CollisionCount > 0 && !IsRunning) return;
         _elapsed += dt;
         Raise(nameof(ClockText));
+        Raise(nameof(DelayedCount));
+        Raise(nameof(DelaySummary));
         // A már közlekedő szerelvények és távozások feldolgozása megelőzi az új belépéseket.
         foreach (var train in Trains.ToList())
             MoveTrain(train, dt);
         DetectCollisions();
         CompleteDepartures();
         ProcessWaitingTrains();
+        if (AutoDispatchEnabled && CollisionCount == 0) RunAutomaticDispatcher();
         UpdateTurnoutLocks();
         RefreshSectionIndicators();
     }
@@ -226,7 +319,9 @@ public sealed class DispatchEngine : BindableBase
         var manual = _manualQueue.Select(p => (Time: p.RequestedAt,
             Plan: (ScheduleItem?)null, Manual: (RequestedTrain?)p));
 
-        foreach (var request in due.Concat(manual).OrderBy(p => p.Time).ToList())
+        foreach (var request in due.Concat(manual)
+                     .OrderBy(p => InterCityPriority ? (p.Plan?.Type ?? p.Manual!.Type) == TrainType.InterCity ? 0 : 1 : 0)
+                     .ThenBy(p => p.Time).ToList())
         {
             var plan = request.Plan;
             var custom = request.Manual;
@@ -270,6 +365,16 @@ public sealed class DispatchEngine : BindableBase
     private bool CanSpawn(int direction, out string reason)
     {
         string side = direction > 0 ? "nyugati" : "keleti";
+        if (!(direction > 0 ? WestEntryOpen : EastEntryOpen))
+        {
+            reason = $"Vár: {side} beléptetés tiltva";
+            return false;
+        }
+        if (Track1Closed && Track2Closed)
+        {
+            reason = "Vár: mindkét állomási vágány lezárva";
+            return false;
+        }
         double start = direction > 0 ? 95 : 1090;
         if (Trains.Any(t => !t.Crashed && Math.Abs(t.X - start) < Train.Length + 70))
         {
@@ -349,7 +454,22 @@ public sealed class DispatchEngine : BindableBase
 
     private bool CanClearSignal(Signal signal, out string reason)
     {
+        if (signal.Code == "N-BE" && !WestEntryOpen ||
+            signal.Code == "K-BE" && !EastEntryOpen ||
+            signal.Code.EndsWith("-N") && !WestExitOpen ||
+            signal.Code.EndsWith("-K") && !EastExitOpen)
+        {
+            reason = "A csatlakozó vonal forgalma tiltva.";
+            return false;
+        }
         string destination = DestinationFor(signal);
+        int chosenTrack = signal.Track >= 0 ? signal.Track :
+            signal.Code == "N-BE" ? WestTurnout.Track : EastTurnout.Track;
+        if ((chosenTrack == 0 && Track1Closed) || (chosenTrack == 1 && Track2Closed))
+        {
+            reason = $"{chosenTrack + 1}. vágány karbantartás miatt lezárva.";
+            return false;
+        }
         if (signal.Track >= 0)
         {
             Turnout point = signal.Direction > 0 ? EastTurnout : WestTurnout;
@@ -425,6 +545,81 @@ public sealed class DispatchEngine : BindableBase
         EastTurnout.IsLocked = Signals.Any(s => s.IsGreen && (s.Code == "K-BE" || s.Code.EndsWith("-K")))
             || Trains.Any(t => !t.Crashed && t.Track >= 0 &&
                 (t.Direction < 0 ? t.X > 665 && t.X < 960 : t.X > 745 && t.X < 910));
+    }
+
+    private void RunAutomaticDispatcher()
+    {
+        // A kihaladási vágányutak előbbre valók a belépőkkel szemben.
+        // Egy időlépésben legfeljebb egy új vágányutat állítunk.
+        foreach (var train in Trains.Where(t => !t.Crashed)
+                     .OrderBy(t => t.Track >= 0 ? 0 : 1)
+                     .ThenBy(t => t.Direction > 0 ? -t.X : t.X))
+        {
+            Signal? next = NextSignal(train);
+            if (next is null || next.IsGreen) continue;
+            if (next.Track < 0 && !(train.Direction > 0 ? WestEntryOpen : EastEntryOpen))
+                continue;
+            if (next.Track >= 0 && !(train.Direction > 0 ? EastExitOpen : WestExitOpen))
+                continue;
+
+            Turnout turnout = next.Code == "N-BE" || next.Code.EndsWith("-N") ? WestTurnout : EastTurnout;
+            int targetTrack = next.Track;
+            if (targetTrack < 0)
+            {
+                var options = new[] { 0, 1 }
+                    .Where(track => !(track == 0 ? Track1Closed : Track2Closed))
+                    .Where(track => !Trains.Any(t => !t.Crashed &&
+                        (t.Track == track && Occupies(t, track == 0 ? "VÁGÁNY 1" : "VÁGÁNY 2") ||
+                         t.PendingSection == (track == 0 ? "VÁGÁNY 1" : "VÁGÁNY 2"))))
+                    .ToList();
+                if (options.Count == 0) continue;
+                // InterCity inkább az átmenő fővágányon; teher a megelőzőn halad.
+                targetTrack = train.Type == TrainType.Teher && options.Contains(1) ? 1 :
+                    options.Contains(0) ? 0 : options[0];
+            }
+
+            if (turnout.Track != targetTrack)
+            {
+                if (turnout.IsLocked) continue;
+                turnout.Track = targetTrack;
+                Log($"AUTOMATA: {turnout.Code} -> {targetTrack + 1}. vágány.", "success");
+                UpdateTurnoutLocks();
+            }
+            if (CanClearSignal(next, out _))
+            {
+                SetSignal(next, true);
+                return;
+            }
+        }
+    }
+
+    public void StopAllTraffic()
+    {
+        AutoDispatchEnabled = false;
+        foreach (var signal in Signals) signal.IsGreen = false;
+        foreach (var train in Trains.Where(t => !t.Crashed))
+        {
+            train.Speed = 0;
+            train.ManualHold = true;
+            train.Emergency = true;
+            train.Status = "KÖZPONTI VÉSZLEÁLLÍTÁS";
+        }
+        UpdateTurnoutLocks();
+        IsRunning = false;
+        SystemMessage = "KÖZPONTI VÉSZLEÁLLÍTÁS: minden vonat megállt, jelzők vörösek.";
+        Log(SystemMessage, "danger");
+    }
+
+    public void ResumeAllTraffic()
+    {
+        foreach (var train in Trains.Where(t => !t.Crashed))
+        {
+            train.ManualHold = false;
+            train.Emergency = false;
+        }
+        IsRunning = true;
+        SystemMessage = "Központi leállítás feloldva. A vörös jelzőket újra be kell állítani.";
+        Log(SystemMessage, "warning");
     }
 
     public void StopSelected()

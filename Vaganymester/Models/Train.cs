@@ -25,9 +25,12 @@ public sealed class Train : BindableBase
     public Brush BodyBrush => Type switch
     {
         TrainType.InterCity => Brushes.Goldenrod,
-        TrainType.Teher => Brushes.SteelBlue,
+        TrainType.Teher => Brushes.LightSteelBlue,
         _ => Brushes.MediumTurquoise
     };
+    public string ConsistLabel => Type == TrainType.Teher
+        ? "Teherszerelvény • áruszállítás"
+        : $"{Carriages.Count} légkondicionált személykocsi • 2+2 üléselrendezés";
     public string DriverName => Driver.Name;
 
     // Az utasok és helyfoglalások a vonat életciklusa alatt megmaradnak.
@@ -35,11 +38,13 @@ public sealed class Train : BindableBase
     public int SeatCapacity => Carriages.Sum(c => c.Capacity);
     public int PassengerCount => Carriages.Sum(c => c.Occupied);
     public int FreeSeats => SeatCapacity - PassengerCount;
+    public double OccupancyPercent => SeatCapacity == 0 ? 0 : 100.0 * PassengerCount / SeatCapacity;
     public string OccupancyText => SeatCapacity == 0 ? "Nincs utastér" : $"{100.0 * PassengerCount / SeatCapacity:0}%";
     public void NotifyPassengerChanged()
     {
         Raise(nameof(SeatCapacity)); Raise(nameof(PassengerCount));
         Raise(nameof(FreeSeats)); Raise(nameof(OccupancyText));
+        Raise(nameof(OccupancyPercent)); Raise(nameof(ConsistLabel));
     }
 
 
